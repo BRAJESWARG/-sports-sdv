@@ -28,7 +28,14 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/api/v1/football/nope)",
       "Bash(curl -s http://localhost:8090/)",
       "Bash(curl -s http://localhost:8090/app.js)",
-      "Bash(gofmt -l internal/ cmd/)"
+      "Bash(gofmt -l internal/ cmd/)",
+      "Bash(gofmt -w internal/ cmd/)",
+      "Bash(git config *)",
+      "Bash(echo \"name: $\\(git config user.name 2>/dev/null || echo unset\\)\")",
+      "Bash(echo \"email: $\\(git config user.email 2>/dev/null || echo unset\\)\")",
+      "Bash(git check-ignore *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)"
     ]
   }
 }

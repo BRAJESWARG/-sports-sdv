@@ -3,7 +3,7 @@
 // Same-origin API (served by the Go backend), so no CORS and no config needed.
 const API = "";
 
-// Known mock season ids (used when a query needs a season).
+// Default season ids used by the standings shortcut (adjust to current seasons).
 const SEASON = { cricket: 1715, football: 23000 };
 
 // Actual team names (used for filtering matches by team).
@@ -311,18 +311,11 @@ document.getElementById("suggestions").addEventListener("click", (e) => {
   if (q) handle(q);
 });
 
-// Reflect the server's live/mock mode per sport in the header badge.
-(async () => {
+// Live-data build.
+(() => {
   const badge = document.getElementById("modeBadge");
-  try {
-    const m = await api("/api/v1/meta");
-    const c = (m.cricket && m.cricket.mode) || "?";
-    const f = (m.football && m.football.mode) || "?";
-    badge.textContent = `🏏 ${c} · ⚽ ${f}`;
-    badge.classList.toggle("live", c === "live" || f === "live");
-  } catch {
-    badge.textContent = "offline?";
-  }
+  badge.textContent = "live";
+  badge.classList.add("live");
 })();
 
 // Greeting

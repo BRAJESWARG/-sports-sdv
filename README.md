@@ -88,28 +88,6 @@ curl "http://localhost:8090/api/v1/rankings?type=TEST&gender=men"
 curl "http://localhost:8090/api/v1/leagues"
 ```
 
-## Offline / mock mode
-
-If your network can't reach `cricket.sportmonks.com` (blocked by a proxy, no
-token yet, or working on a plane), run with embedded sample data:
-
-```bash
-SPORTMONKS_MOCK=true FOOTBALL_MOCK=true make run
-# or set SPORTMONKS_MOCK=true / FOOTBALL_MOCK=true in .env
-```
-
-`SPORTMONKS_MOCK` covers cricket, `FOOTBALL_MOCK` covers football — they're
-independent, so you can mock one sport and hit the other live. Every endpoint
-responds with realistic sample data served from each provider's
-`fixtures/*.json`. No token or network is required. It runs the real decode +
-DTO-mapping code, so it's a faithful test of everything except the upstream HTTP
-hop — ideal for building/testing your frontend or Postman collection offline.
-Flip a flag back to `false` once you can reach SportMonks.
-
-> The mock ranking fixtures use assumed `matches`/`rating`/`points` field names;
-> verify those against a live payload (see the rankings note below) before
-> relying on them.
-
 ## Troubleshooting: `x509: certificate signed by unknown authority`
 
 The server can't verify SportMonks' TLS cert. Diagnose the issuer:
@@ -123,8 +101,8 @@ echo | openssl s_client -connect cricket.sportmonks.com:443 \
   store is stale: `sudo apt-get install -y ca-certificates && sudo update-ca-certificates`.
 - **Issuer is a proxy/company/self-signed** → a TLS-intercepting proxy is in the
   path. Either trust its CA, set `SPORTMONKS_INSECURE_SKIP_VERIFY=true` (dev only,
-  works if the proxy forwards), or use `SPORTMONKS_MOCK=true` if it blocks
-  entirely (returns an HTML page instead of JSON).
+  works only if the proxy forwards to SportMonks), or move to a network that can
+  reach `cricket.sportmonks.com` directly.
 
 ## Notes
 
@@ -139,21 +117,14 @@ echo | openssl s_client -connect cricket.sportmonks.com:443 \
 - **`live` flag on matches**: SportMonks sets `live: true` on any fixture that
   *will* have live coverage, not only those in play right now — the DTO passes it
   through verbatim. Use `status` (e.g. `NS`, `1st Innings`, `Finished`) for state.
-- **Rankings stat columns (verify)**: the rankings order and team names are
-  verified against live data. The `matches`/`rating`/`points` columns are mapped
-  from the field names in `internal/sportmonks/types.go` (`RankedTeam`) but came
-  back as `0` in testing — likely a field-name difference in the ranked-team
-  payload. Confirm the real names against your plan's response, e.g.:
-  ```bash
-  curl "https://cricket.sportmonks.com/api/v2.0/team-rankings?api_token=$TOKEN&filter[type]=TEST" | jq '.data[0].team.data[0]'
-  ```
-  then adjust the json tags on `RankedTeam` if needed.
+- **Cricket rankings**: verified against live data. The stats live in a nested
+  `ranking` object (`{position, matches, points, rating}`) per team — mapped in
+  `internal/sportmonks/types.go` (`RankedTeam`/`RankingStats`).
 - **Football standings columns (verify)**: SportMonks v3 exposes played/won/draw/
   lost/goals as `details` keyed by numeric `type_id`. The ids in
-  `internal/sports/service_football.go` (`ftType*`) are best-effort; the mock
-  fixtures use them so the mapping demos end-to-end, but confirm them against a
-  live standings payload before relying on those columns. Position, team, and
-  points are read directly and are safe.
+  `internal/sports/service_football.go` (`ftType*`) are best-effort; confirm them
+  against a live standings payload before relying on those columns. Position,
+  team, and points are read directly and are safe. (Requires a football token.)
 - **Next steps**: persist to Postgres for history, add a scheduled sync
   (goroutine + ticker) to pre-warm the cache, and add auth/rate-limiting on your
   own endpoints.

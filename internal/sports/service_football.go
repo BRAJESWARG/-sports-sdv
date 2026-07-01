@@ -28,7 +28,7 @@ func NewFootball(client *football.Client, c cache.Cache, ttl, ttlLive time.Durat
 
 // SportMonks v3 standings expose stats as "details" keyed by type_id. These ids
 // are best-effort and SHOULD be verified against a live payload before relying
-// on the played/won/draw/lost/goals columns (mock fixtures use these values).
+// on the played/won/draw/lost/goals columns.
 const (
 	ftTypePlayed       = 129
 	ftTypeWon          = 130

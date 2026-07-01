@@ -25,7 +25,6 @@ type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
-	mock    bool
 }
 
 // New builds a live client. baseURL should be the v3 football root, e.g.
@@ -47,10 +46,6 @@ func New(baseURL, token string, timeout time.Duration, insecureSkipVerify bool) 
 	}
 }
 
-// NewMock builds a client that serves embedded sample data (see fixtures.go)
-// instead of making any network call.
-func NewMock() *Client { return &Client{mock: true} }
-
 // APIError is returned on non-2xx responses or when the envelope reports an error.
 type APIError struct {
 	StatusCode int
@@ -69,9 +64,6 @@ type envelope struct {
 
 // get performs a GET against path and returns the raw `data` payload.
 func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMessage, error) {
-	if c.mock {
-		return mockData(path)
-	}
 	if q == nil {
 		q = url.Values{}
 	}

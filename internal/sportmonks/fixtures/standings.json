@@ -1,7 +1,0 @@
-{
-  "data": [
-    { "season_id": 1715, "position": 1, "team_id": 2, "points": 8, "won": 4, "lost": 1, "draw": 0, "noresult": 0, "team": { "data": { "id": 2, "name": "India", "code": "IND" } } },
-    { "season_id": 1715, "position": 2, "team_id": 1, "points": 6, "won": 3, "lost": 2, "draw": 0, "noresult": 0, "team": { "data": { "id": 1, "name": "England", "code": "ENG" } } },
-    { "season_id": 1715, "position": 3, "team_id": 3, "points": 4, "won": 2, "lost": 3, "draw": 0, "noresult": 0, "team": { "data": { "id": 3, "name": "Australia", "code": "AUS" } } }
-  ]
-}

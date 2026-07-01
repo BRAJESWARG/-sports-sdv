@@ -18,15 +18,10 @@ type Config struct {
 	// Dev-only escape hatch for broken CA stores / intercepting proxies.
 	SportmonksInsecureSkipVerify bool
 
-	// SportmonksMock serves embedded sample data instead of calling upstream.
-	// Useful for offline development or when a proxy blocks egress.
-	SportmonksMock bool
-
 	// --- SportMonks Football (v3) ---
 	FootballToken              string
 	FootballBaseURL            string
 	FootballInsecureSkipVerify bool
-	FootballMock               bool
 
 	CacheTTL     time.Duration
 	CacheTTLLive time.Duration
@@ -43,18 +38,16 @@ func Load() (*Config, error) {
 		SportmonksToken:              firstNonEmpty(os.Getenv("SPORTMONKS_API_TOKEN"), os.Getenv("API_CRICKET_KEY")),
 		SportmonksBaseURL:            getenv("SPORTMONKS_BASE_URL", "https://cricket.sportmonks.com/api/v2.0"),
 		SportmonksInsecureSkipVerify: getbool("SPORTMONKS_INSECURE_SKIP_VERIFY", false),
-		SportmonksMock:               getbool("SPORTMONKS_MOCK", false),
 		FootballToken:                firstNonEmpty(os.Getenv("FOOTBALL_API_TOKEN"), os.Getenv("SPORTMONKS_FOOTBALL_TOKEN")),
 		FootballBaseURL:              getenv("FOOTBALL_BASE_URL", "https://api.sportmonks.com/v3/football"),
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
-		FootballMock:                 getbool("FOOTBALL_MOCK", false),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
 		CacheTTLLive:                 getdur("CACHE_TTL_LIVE", 20*time.Second),
 		UpstreamTimeout:              getdur("UPSTREAM_TIMEOUT", 10*time.Second),
 	}
 
-	if cfg.SportmonksToken == "" && !cfg.SportmonksMock {
-		return nil, fmt.Errorf("SPORTMONKS_API_TOKEN (or API_CRICKET_KEY) is required (or set SPORTMONKS_MOCK=true for offline sample data)")
+	if cfg.SportmonksToken == "" {
+		return nil, fmt.Errorf("SPORTMONKS_API_TOKEN (or API_CRICKET_KEY) is required")
 	}
 	return cfg, nil
 }

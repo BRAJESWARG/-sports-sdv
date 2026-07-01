@@ -31,26 +31,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	var client *sportmonks.Client
-	if cfg.SportmonksMock {
-		client = sportmonks.NewMock()
-		log.Warn("SPORTMONKS_MOCK is enabled — serving embedded sample data, NOT live SportMonks")
-	} else {
-		client = sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
-		if cfg.SportmonksInsecureSkipVerify {
-			log.Warn("SPORTMONKS_INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
-		}
+	client := sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
+	fbClient := football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
+	if cfg.SportmonksInsecureSkipVerify || cfg.FootballInsecureSkipVerify {
+		log.Warn("INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
 	}
-
-	var fbClient *football.Client
-	if cfg.FootballMock {
-		fbClient = football.NewMock()
-		log.Warn("FOOTBALL_MOCK is enabled — serving embedded sample data, NOT live SportMonks Football")
-	} else {
-		fbClient = football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
-		if cfg.FootballInsecureSkipVerify {
-			log.Warn("FOOTBALL_INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
-		}
+	if cfg.FootballToken == "" {
+		log.Warn("FOOTBALL_API_TOKEN is not set — football endpoints will fail until a token is provided")
 	}
 
 	mem := cache.NewMemory(time.Minute)
@@ -58,7 +45,7 @@ func main() {
 
 	svc := sports.New(client, mem, cfg.CacheTTL, cfg.CacheTTLLive)
 	fbSvc := sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
-	router := httpapi.NewRouter(svc, fbSvc, cfg.SportmonksMock, cfg.FootballMock, log)
+	router := httpapi.NewRouter(svc, fbSvc, log)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
