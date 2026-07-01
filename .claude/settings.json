@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /home/mihup/Documents/GitHub/bgmaster/yaatraexpress && echo \"=== api ===\"; ls api 2>/dev/null | head; echo \"=== booking-service ===\"; ls booking-service 2>/dev/null | head; echo \"=== frontend ===\"; ls frontend 2>/dev/null | head; echo \"=== root files ===\"; find . -maxdepth 2 -name \"package.json\" -o -maxdepth 2 -name \"go.mod\" -o -maxdepth 2 -name \"requirements.txt\" -o -maxdepth 2 -name \"pom.xml\" 2>/dev/null | head)",
+      "Read(//home/mihup/Documents/GitHub/bgmaster/yaatraexpress/**)",
+      "Read(//home/mihup/Documents/GitHub/bgmaster/mygolang-ico/**)",
+      "Bash(go version *)",
+      "Bash(cd /home/mihup/Documents/GitHub/bgmaster/mygolang-ico && echo \"=== 24buildapi ===\"; ls 24buildapi 2>/dev/null; echo \"--- main snippet ---\"; find 24buildapi -name \"*.go\" | head -1 | xargs head -40 2>/dev/null; echo; echo \"=== 25mongoapi router hint ===\"; grep -rhiE \"gorilla/mux|gin-gonic|http.HandleFunc|http.NewServeMux|r.HandleFunc\" 24buildapi 25mongoapi 2>/dev/null | head)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(gofmt -l .)",
+      "Bash(gofmt -w internal/apifootball/types.go)",
+      "WebSearch",
+      "WebFetch(domain:docs.sportmonks.com)",
+      "Bash(gofmt -w ./...)",
+      "Bash(gofmt -w internal/sportmonks/*.go internal/sports/*.go internal/httpapi/*.go internal/config/*.go cmd/server/*.go)",
+      "Bash(gofmt -w internal/sportmonks/*.go)",
+      "Bash(gofmt -w internal/config/config.go internal/sportmonks/client.go cmd/server/main.go)",
+      "Bash(gofmt -w internal/football/*.go internal/sports/*.go internal/httpapi/*.go internal/config/*.go cmd/server/*.go)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -sf http://localhost:8090/healthz)",
+      "Bash(break)",
+      "Bash(curl -s -D - http://localhost:8090/ -o /tmp/idx.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -D - http://localhost:8090/styles.css -o /dev/null)",
+      "Bash(curl -s -D - http://localhost:8090/app.js -o /tmp/app.js)",
+      "Bash(curl -s http://localhost:8090/api/v1/football/livescores)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8090/api/v1/football/nope)",
+      "Bash(curl -s http://localhost:8090/)",
+      "Bash(curl -s http://localhost:8090/app.js)",
+      "Bash(gofmt -l internal/ cmd/)"
+    ]
+  }
+}

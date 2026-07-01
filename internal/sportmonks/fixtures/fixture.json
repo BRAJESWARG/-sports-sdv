@@ -1,0 +1,32 @@
+{
+  "data": {
+    "id": 67360,
+    "league_id": 3,
+    "season_id": 1715,
+    "round": "Warm-up",
+    "localteam_id": 3,
+    "visitorteam_id": 2,
+    "starting_at": "2026-06-28T09:30:00.000000Z",
+    "type": "T20I",
+    "live": false,
+    "status": "Finished",
+    "note": "India won by 6 wickets",
+    "localteam": { "data": { "id": 3, "name": "Australia", "code": "AUS" } },
+    "visitorteam": { "data": { "id": 2, "name": "India", "code": "IND" } },
+    "runs": { "data": [
+      { "team_id": 3, "inning": 1, "score": 152, "wickets": 9, "overs": 20.0 },
+      { "team_id": 2, "inning": 2, "score": 153, "wickets": 4, "overs": 18.2 }
+    ] },
+    "batting": { "data": [
+      { "team_id": 3, "player_id": 101, "score": 45, "ball": 32, "four_x": 4, "six_x": 2, "rate": 140.63, "batsman": { "data": { "id": 101, "fullname": "Travis Head" } } },
+      { "team_id": 3, "player_id": 102, "score": 30, "ball": 28, "four_x": 3, "six_x": 0, "rate": 107.14, "batsman": { "data": { "id": 102, "fullname": "Marnus Labuschagne" } } },
+      { "team_id": 2, "player_id": 201, "score": 61, "ball": 40, "four_x": 6, "six_x": 3, "rate": 152.50, "batsman": { "data": { "id": 201, "fullname": "Shubman Gill" } } },
+      { "team_id": 2, "player_id": 202, "score": 48, "ball": 31, "four_x": 5, "six_x": 1, "rate": 154.84, "batsman": { "data": { "id": 202, "fullname": "Suryakumar Yadav" } } }
+    ] },
+    "bowling": { "data": [
+      { "team_id": 2, "player_id": 210, "overs": 4.0, "runs": 28, "wickets": 3, "wide": 1, "noball": 0, "rate": 7.0, "bowler": { "data": { "id": 210, "fullname": "Jasprit Bumrah" } } },
+      { "team_id": 2, "player_id": 211, "overs": 4.0, "runs": 34, "wickets": 2, "wide": 0, "noball": 0, "rate": 8.5, "bowler": { "data": { "id": 211, "fullname": "Kuldeep Yadav" } } },
+      { "team_id": 3, "player_id": 110, "overs": 4.0, "runs": 41, "wickets": 1, "wide": 0, "noball": 1, "rate": 10.25, "bowler": { "data": { "id": 110, "fullname": "Mitchell Starc" } } }
+    ] }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "data": [
+    { "position": 1, "participant_id": 19, "points": 89, "participant": { "id": 19, "name": "Arsenal", "short_code": "ARS", "image_path": "" }, "details": [ {"type_id":129,"value":38}, {"type_id":130,"value":28}, {"type_id":131,"value":5}, {"type_id":132,"value":5}, {"type_id":133,"value":88}, {"type_id":134,"value":30} ] },
+    { "position": 2, "participant_id": 8, "points": 84, "participant": { "id": 8, "name": "Liverpool", "short_code": "LIV", "image_path": "" }, "details": [ {"type_id":129,"value":38}, {"type_id":130,"value":25}, {"type_id":131,"value":9}, {"type_id":132,"value":4}, {"type_id":133,"value":79}, {"type_id":134,"value":35} ] },
+    { "position": 3, "participant_id": 9, "points": 82, "participant": { "id": 9, "name": "Manchester City", "short_code": "MCI", "image_path": "" }, "details": [ {"type_id":129,"value":38}, {"type_id":130,"value":25}, {"type_id":131,"value":7}, {"type_id":132,"value":6}, {"type_id":133,"value":94}, {"type_id":134,"value":40} ] }
+  ]
+}

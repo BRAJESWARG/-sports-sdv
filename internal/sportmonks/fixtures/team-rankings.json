@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "resource": "rankings",
+      "type": "TEST",
+      "gender": "men",
+      "team": [
+        { "resource": "teams", "id": 36, "name": "Australia", "code": "AUS", "position": 1, "ranking": { "position": 1, "matches": 24, "points": 3138, "rating": 131 } },
+        { "resource": "teams", "id": 40, "name": "South Africa", "code": "SA", "position": 2, "ranking": { "position": 2, "matches": 19, "points": 2256, "rating": 119 } },
+        { "resource": "teams", "id": 10, "name": "India", "code": "IND", "position": 3, "ranking": { "position": 3, "matches": 26, "points": 2714, "rating": 104 } },
+        { "resource": "teams", "id": 38, "name": "England", "code": "ENG", "position": 4, "ranking": { "position": 4, "matches": 28, "points": 2850, "rating": 102 } }
+      ]
+    },
+    {
+      "resource": "rankings",
+      "type": "ODI",
+      "gender": "men",
+      "team": [
+        { "resource": "teams", "id": 10, "name": "India", "code": "IND", "position": 1, "ranking": { "position": 1, "matches": 30, "points": 3660, "rating": 122 } },
+        { "resource": "teams", "id": 36, "name": "Australia", "code": "AUS", "position": 2, "ranking": { "position": 2, "matches": 27, "points": 3051, "rating": 113 } }
+      ]
+    }
+  ]
+}

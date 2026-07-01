@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": 70025,
+      "league_id": 3,
+      "season_id": 1715,
+      "round": "1st T20I",
+      "localteam_id": 1,
+      "visitorteam_id": 2,
+      "starting_at": "2026-07-01T07:30:00.000000Z",
+      "type": "T20I",
+      "live": true,
+      "status": "1st Innings",
+      "note": "",
+      "localteam": { "data": { "id": 1, "name": "England", "code": "ENG" } },
+      "visitorteam": { "data": { "id": 2, "name": "India", "code": "IND" } },
+      "runs": [
+        { "team_id": 2, "inning": 1, "score": 64, "wickets": 2, "overs": 9.1 }
+      ]
+    }
+  ]
+}

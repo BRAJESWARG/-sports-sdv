@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "id": 19000001,
+      "league_id": 8,
+      "season_id": 23000,
+      "state_id": 22,
+      "round_id": 340001,
+      "name": "Arsenal vs Chelsea",
+      "starting_at": "2026-07-01 16:30:00",
+      "result_info": null,
+      "participants": [
+        { "id": 19, "name": "Arsenal", "short_code": "ARS", "image_path": "", "meta": { "location": "home", "winner": null, "position": 1 } },
+        { "id": 18, "name": "Chelsea", "short_code": "CHE", "image_path": "", "meta": { "location": "away", "winner": null, "position": 4 } }
+      ],
+      "scores": [
+        { "participant_id": 19, "description": "CURRENT", "score": { "goals": 2, "participant": "home" } },
+        { "participant_id": 18, "description": "CURRENT", "score": { "goals": 1, "participant": "away" } }
+      ],
+      "state": { "id": 22, "state": "INPLAY_2ND_HALF", "name": "2nd Half", "short_name": "2nd" }
+    }
+  ]
+}

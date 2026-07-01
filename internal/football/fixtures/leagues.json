@@ -1,0 +1,7 @@
+{
+  "data": [
+    { "id": 8, "name": "Premier League", "image_path": "", "country_id": 462 },
+    { "id": 564, "name": "La Liga", "image_path": "", "country_id": 32 },
+    { "id": 82, "name": "Bundesliga", "image_path": "", "country_id": 11 }
+  ]
+}

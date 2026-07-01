@@ -1,0 +1,24 @@
+{
+  "data": {
+    "id": 19000000,
+    "league_id": 8,
+    "season_id": 23000,
+    "state_id": 5,
+    "round_id": 340000,
+    "name": "Tottenham Hotspur vs Arsenal",
+    "starting_at": "2026-06-28 16:30:00",
+    "result_info": "Arsenal won after full time.",
+    "participants": [
+      { "id": 6, "name": "Tottenham Hotspur", "short_code": "TOT", "image_path": "", "meta": { "location": "home", "winner": false, "position": 6 } },
+      { "id": 19, "name": "Arsenal", "short_code": "ARS", "image_path": "", "meta": { "location": "away", "winner": true, "position": 1 } }
+    ],
+    "scores": [
+      { "participant_id": 6, "description": "1ST_HALF", "score": { "goals": 0, "participant": "home" } },
+      { "participant_id": 19, "description": "1ST_HALF", "score": { "goals": 2, "participant": "away" } },
+      { "participant_id": 6, "description": "CURRENT", "score": { "goals": 1, "participant": "home" } },
+      { "participant_id": 19, "description": "CURRENT", "score": { "goals": 3, "participant": "away" } }
+    ],
+    "state": { "id": 5, "state": "FT", "name": "Full Time", "short_name": "FT" },
+    "round": { "id": 340000, "name": "38" }
+  }
+}

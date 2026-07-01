@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sports SDV — Score Chatbot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="logo">🏏⚽</div>
+      <div>
+        <h1>Sports Chatbot</h1>
+        <p class="sub">Ask for live scores, matches, tables &amp; rankings</p>
+      </div>
+      <span class="badge-mock" id="modeBadge">…</span>
+    </header>
+
+    <main id="thread" class="thread" aria-live="polite"></main>
+
+    <div class="suggestions" id="suggestions">
+      <button class="chip" data-q="live football">⚽ Live football</button>
+      <button class="chip" data-q="live cricket">🏏 Live cricket</button>
+      <button class="chip" data-q="Arsenal">Arsenal</button>
+      <button class="chip" data-q="India">India</button>
+      <button class="chip" data-q="premier league table">Premier League table</button>
+      <button class="chip" data-q="test rankings">Test rankings</button>
+      <button class="chip" data-q="football matches">Football fixtures</button>
+    </div>
+
+    <form class="composer" id="composer">
+      <input id="input" type="text" autocomplete="off"
+             placeholder="Try: live football · Arsenal · Premier League table · India" />
+      <button type="submit" aria-label="Send">➤</button>
+    </form>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
