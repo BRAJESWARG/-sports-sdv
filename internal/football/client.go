@@ -1,9 +1,9 @@
-// Package football is a thin, typed client for the SportMonks Football API v3.
-// It handles auth (Authorization header), request building, and the v3
-// {"data","pagination"} envelope. Unlike the cricket client, v3 includes are
-// inline (no {"data": ...} wrappers). It does not cache — that is the service's job.
+// Package football is a thin, typed client for the football-data.org v4 API.
+// It handles auth (X-Auth-Token header), request building, and per-endpoint
+// decoding. It does not cache — that is the service's job.
 //
-// Docs: https://docs.sportmonks.com/football
+// Docs: https://docs.football-data.org/general/v4/
+// A free API token is required (register at https://www.football-data.org/).
 package football
 
 import (
@@ -22,18 +22,17 @@ import (
 	"time"
 )
 
-// Client talks to the SportMonks Football v3 upstream.
+// Client talks to the football-data.org upstream.
 type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
 }
 
-// New builds a live client. baseURL should be the v3 football root, e.g.
-// https://api.sportmonks.com/v3/football
+// New builds a client. baseURL should be the v4 root, e.g.
+// https://api.football-data.org/v4
 //
-// insecureSkipVerify disables upstream TLS verification — dev-only, see the
-// cricket client for the same caveat.
+// insecureSkipVerify disables upstream TLS verification — dev-only.
 func New(baseURL, token string, timeout time.Duration, insecureSkipVerify bool) *Client {
 	httpClient := &http.Client{Timeout: timeout}
 	if insecureSkipVerify {
@@ -48,7 +47,7 @@ func New(baseURL, token string, timeout time.Duration, insecureSkipVerify bool) 
 	}
 }
 
-// APIError is returned on non-2xx responses or when the envelope reports an error.
+// APIError is returned on non-2xx responses or when the body reports an error.
 type APIError struct {
 	StatusCode int
 	Endpoint   string
@@ -59,16 +58,13 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("football: %s returned %d: %s", e.Endpoint, e.StatusCode, e.Message)
 }
 
-type envelope struct {
-	Data    json.RawMessage `json:"data"`
-	Message string          `json:"message"`
+type errBody struct {
+	Message   string `json:"message"`
+	ErrorCode int    `json:"errorCode"`
 }
 
-// get performs a GET against path and returns the raw `data` payload.
-func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMessage, error) {
-	if q == nil {
-		q = url.Values{}
-	}
+// get performs a GET against path and returns the raw response body.
+func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, error) {
 	u := c.baseURL + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
@@ -77,8 +73,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	// v3 auth: token in the Authorization header (api_token query also works).
-	req.Header.Set("Authorization", c.token)
+	req.Header.Set("X-Auth-Token", c.token)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := doWithRetry(c.http, req)
@@ -92,11 +87,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 		return nil, fmt.Errorf("read body: %w", err)
 	}
 
-	var env envelope
-	_ = json.Unmarshal(body, &env)
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := env.Message
+		var e errBody
+		_ = json.Unmarshal(body, &e)
+		msg := e.Message
 		if msg == "" {
 			msg = summarizeBody(body)
 		}
@@ -105,10 +99,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	if looksLikeHTML(body) {
 		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: proxyHint}
 	}
-	return env.Data, nil
+	return body, nil
 }
 
-const proxyHint = "received an HTML page instead of JSON — a TLS-intercepting proxy or network gateway is likely blocking traffic between this server and SportMonks"
+const proxyHint = "received an HTML page instead of JSON — a proxy or network gateway is likely blocking traffic to the football provider"
 
 func looksLikeHTML(b []byte) bool {
 	t := bytes.TrimSpace(b)
@@ -126,9 +120,7 @@ func summarizeBody(b []byte) string {
 	return string(t)
 }
 
-// doWithRetry performs the request, retrying once on a transient transport
-// error after a short backoff. Timeouts are NOT retried (that just doubles the
-// wait). GET requests are safe to retry.
+// doWithRetry retries a transient transport error once (not timeouts).
 func doWithRetry(cl *http.Client, req *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
@@ -148,99 +140,92 @@ func doWithRetry(cl *http.Client, req *http.Request) (*http.Response, error) {
 	return nil, err
 }
 
-// transportError maps a network failure to a clean APIError. It never includes
-// the request URL, which carries the token.
+// transportError maps a network failure to a clean APIError (no URL/token leak).
 func transportError(path string, err error) *APIError {
-	msg := "could not reach SportMonks"
+	msg := "could not reach the football data provider"
 	var nerr net.Error
 	if errors.As(err, &nerr) && nerr.Timeout() {
-		msg = "SportMonks request timed out — please try again"
+		msg = "football provider request timed out — please try again"
 	}
 	return &APIError{Endpoint: path, Message: msg}
 }
 
-// inc builds a query with a v3 include list (semicolon-separated).
-func inc(names ...string) url.Values {
+// nextDay returns the day after a YYYY-MM-DD date; football-data.org treats
+// dateTo as exclusive, so callers pass nextDay(to) to include the whole to-day.
+func nextDay(d string) string {
+	t, err := time.Parse("2006-01-02", d)
+	if err != nil {
+		return d
+	}
+	return t.AddDate(0, 0, 1).Format("2006-01-02")
+}
+
+// Livescores returns matches currently in play (status=LIVE covers IN_PLAY+PAUSED).
+func (c *Client) Livescores(ctx context.Context) ([]Match, error) {
 	q := url.Values{}
-	if len(names) > 0 {
-		q.Set("include", strings.Join(names, ";"))
-	}
-	return q
-}
-
-var fixtureIncludes = []string{"participants", "scores", "state", "league"}
-
-// Livescores returns matches currently in play.
-func (c *Client) Livescores(ctx context.Context) ([]Fixture, error) {
-	raw, err := c.get(ctx, "/livescores/inplay", inc(fixtureIncludes...))
+	q.Set("status", "LIVE")
+	body, err := c.get(ctx, "/matches", q)
 	if err != nil {
 		return nil, err
 	}
-	return decodeSlice[Fixture](raw, "livescores")
+	var env matchesEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("decode livescores: %w", err)
+	}
+	return env.Matches, nil
 }
 
-// Fixtures returns fixtures matching q (plus the standard includes).
-func (c *Client) Fixtures(ctx context.Context, q url.Values) ([]Fixture, error) {
-	if q == nil {
-		q = url.Values{}
-	}
-	q.Set("include", strings.Join(fixtureIncludes, ";"))
-	raw, err := c.get(ctx, "/fixtures", q)
+// MatchesBetween returns matches with dates in [from, to] (inclusive of `to`).
+func (c *Client) MatchesBetween(ctx context.Context, from, to string) ([]Match, error) {
+	q := url.Values{}
+	q.Set("dateFrom", from)
+	q.Set("dateTo", nextDay(to)) // dateTo is exclusive upstream
+	body, err := c.get(ctx, "/matches", q)
 	if err != nil {
 		return nil, err
 	}
-	return decodeSlice[Fixture](raw, "fixtures")
+	var env matchesEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("decode matches: %w", err)
+	}
+	return env.Matches, nil
 }
 
-// FixturesBetween returns fixtures whose start date falls in [from, to] (YYYY-MM-DD).
-func (c *Client) FixturesBetween(ctx context.Context, from, to string) ([]Fixture, error) {
-	raw, err := c.get(ctx, "/fixtures/between/"+from+"/"+to, inc(fixtureIncludes...))
+// Match returns a single match by id.
+func (c *Client) Match(ctx context.Context, id int64) (*Match, error) {
+	body, err := c.get(ctx, "/matches/"+strconv.FormatInt(id, 10), nil)
 	if err != nil {
 		return nil, err
 	}
-	return decodeSlice[Fixture](raw, "fixtures")
+	var m Match
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, fmt.Errorf("decode match: %w", err)
+	}
+	return &m, nil
 }
 
-// Fixture returns a single match with includes.
-func (c *Client) Fixture(ctx context.Context, id int64) (*Fixture, error) {
-	q := inc("participants", "scores", "state", "league", "round")
-	raw, err := c.get(ctx, "/fixtures/"+strconv.FormatInt(id, 10), q)
+// Standings returns the standings for a competition code (e.g. "PL").
+func (c *Client) Standings(ctx context.Context, competitionCode string) (*StandingsResponse, error) {
+	body, err := c.get(ctx, "/competitions/"+competitionCode+"/standings", nil)
 	if err != nil {
 		return nil, err
 	}
-	var f Fixture
-	if err := json.Unmarshal(raw, &f); err != nil {
-		return nil, fmt.Errorf("decode fixture: %w", err)
+	var s StandingsResponse
+	if err := json.Unmarshal(body, &s); err != nil {
+		return nil, fmt.Errorf("decode standings: %w", err)
 	}
-	return &f, nil
+	return &s, nil
 }
 
-// StandingsBySeason returns the standings table for a season.
-func (c *Client) StandingsBySeason(ctx context.Context, seasonID int64) ([]Standing, error) {
-	q := inc("participant", "details")
-	raw, err := c.get(ctx, "/standings/season/"+strconv.FormatInt(seasonID, 10), q)
+// Competitions returns the competitions the token can access.
+func (c *Client) Competitions(ctx context.Context) ([]Competition, error) {
+	body, err := c.get(ctx, "/competitions", nil)
 	if err != nil {
 		return nil, err
 	}
-	return decodeSlice[Standing](raw, "standings")
-}
-
-// Leagues returns competitions.
-func (c *Client) Leagues(ctx context.Context, q url.Values) ([]League, error) {
-	raw, err := c.get(ctx, "/leagues", q)
-	if err != nil {
-		return nil, err
+	var env competitionsEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("decode competitions: %w", err)
 	}
-	return decodeSlice[League](raw, "leagues")
-}
-
-func decodeSlice[T any](raw json.RawMessage, what string) ([]T, error) {
-	var out []T
-	if len(raw) == 0 || string(raw) == "null" {
-		return out, nil
-	}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, fmt.Errorf("decode %s: %w", what, err)
-	}
-	return out, nil
+	return env.Competitions, nil
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/bgmaster/sports-sdv/internal/sports"
 )
@@ -54,19 +55,18 @@ func (h *FootballHandlers) match(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": data})
 }
 
-// GET /api/v1/football/standings?season=
+// GET /api/v1/football/standings?competition=PL
 func (h *FootballHandlers) standings(w http.ResponseWriter, r *http.Request) {
-	seasonID, err := strconv.ParseInt(r.URL.Query().Get("season"), 10, 64)
-	if err != nil || seasonID <= 0 {
-		writeError(w, http.StatusBadRequest, "query param 'season' (numeric season id) is required")
-		return
+	comp := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("competition")))
+	if comp == "" {
+		comp = "PL" // default: Premier League
 	}
-	data, err := h.svc.Standings(r.Context(), seasonID)
+	data, err := h.svc.Standings(r.Context(), comp)
 	if err != nil {
 		mapUpstreamError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"count": len(data), "data": data})
+	writeJSON(w, http.StatusOK, map[string]any{"competition": comp, "count": len(data), "data": data})
 }
 
 // GET /api/v1/football/leagues

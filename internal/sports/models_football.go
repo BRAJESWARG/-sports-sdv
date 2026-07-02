@@ -7,11 +7,12 @@ package sports
 type FootballMatchDTO struct {
 	ID          int64  `json:"id"`
 	Name        string `json:"name"`
-	Status      string `json:"status"`      // e.g. "Full Time", "2nd Half"
-	StatusShort string `json:"statusShort"` // e.g. "FT", "NS", "INPLAY_2ND_HALF"
+	Status      string `json:"status"`      // e.g. "Full Time", "In Play", "Scheduled"
+	StatusShort string `json:"statusShort"` // raw upstream status (IN_PLAY, FINISHED, ...)
+	Live        bool   `json:"live"`
 	StartingAt  string `json:"startingAt"`
+	League      string `json:"league,omitempty"`
 	LeagueID    int64  `json:"leagueId"`
-	SeasonID    int64  `json:"seasonId"`
 	ResultInfo  string `json:"resultInfo,omitempty"`
 	HomeTeam    string `json:"homeTeam"`
 	AwayTeam    string `json:"awayTeam"`

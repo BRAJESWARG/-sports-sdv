@@ -12,8 +12,8 @@ import (
 	"github.com/bgmaster/sports-sdv/internal/football"
 )
 
-// FootballService orchestrates the SportMonks Football (v3) client + cache and
-// maps upstream types to football DTOs.
+// FootballService orchestrates the football-data.org client + cache and maps
+// upstream types to football DTOs.
 type FootballService struct {
 	client  *football.Client
 	cache   cache.Cache
@@ -26,51 +26,39 @@ func NewFootball(client *football.Client, c cache.Cache, ttl, ttlLive time.Durat
 	return &FootballService{client: client, cache: c, ttl: ttl, ttlLive: ttlLive}
 }
 
-// SportMonks v3 standings expose stats as "details" keyed by type_id. These ids
-// are best-effort and SHOULD be verified against a live payload before relying
-// on the played/won/draw/lost/goals columns.
-const (
-	ftTypePlayed       = 129
-	ftTypeWon          = 130
-	ftTypeDraw         = 131
-	ftTypeLost         = 132
-	ftTypeGoalsFor     = 133
-	ftTypeGoalsAgainst = 134
-)
-
 // Livescores returns matches in play. Short-TTL cached.
 func (fs *FootballService) Livescores(ctx context.Context) ([]FootballMatchDTO, error) {
 	return cacheAside(ctx, fs.cache, "fb:livescores", fs.ttlLive, func(ctx context.Context) ([]FootballMatchDTO, error) {
-		fx, err := fs.client.Livescores(ctx)
+		ms, err := fs.client.Livescores(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return mapFootballMatches(fx), nil
+		return mapFootballMatches(ms), nil
 	})
 }
 
-// Matches returns fixtures (schedule & results). Honors date / from+to; with no
-// filter it defaults to the next 7 days so it never dumps the whole catalogue.
+// Matches returns matches (schedule & results). Honors date / from+to; with no
+// filter it defaults to the next 7 days.
 func (fs *FootballService) Matches(ctx context.Context, q url.Values) ([]FootballMatchDTO, error) {
 	date, from, to := q.Get("date"), q.Get("from"), q.Get("to")
 	key := "fb:matches?" + q.Encode()
 	ttl := fs.ttl
 	return cacheAside(ctx, fs.cache, key, ttl, func(ctx context.Context) ([]FootballMatchDTO, error) {
-		var fx []football.Fixture
+		var ms []football.Match
 		var err error
 		switch {
 		case date != "":
-			fx, err = fs.client.FixturesBetween(ctx, date, date)
+			ms, err = fs.client.MatchesBetween(ctx, date, date)
 		case from != "" && to != "":
-			fx, err = fs.client.FixturesBetween(ctx, from, to)
+			ms, err = fs.client.MatchesBetween(ctx, from, to)
 		default:
 			now := time.Now().UTC()
-			fx, err = fs.client.FixturesBetween(ctx, now.Format("2006-01-02"), now.AddDate(0, 0, 7).Format("2006-01-02"))
+			ms, err = fs.client.MatchesBetween(ctx, now.Format("2006-01-02"), now.AddDate(0, 0, 7).Format("2006-01-02"))
 		}
 		if err != nil {
 			return nil, err
 		}
-		return mapFootballMatches(fx), nil
+		return mapFootballMatches(ms), nil
 	})
 }
 
@@ -78,43 +66,53 @@ func (fs *FootballService) Matches(ctx context.Context, q url.Values) ([]Footbal
 func (fs *FootballService) Match(ctx context.Context, id int64) (*FootballMatchDTO, error) {
 	key := fmt.Sprintf("fb:match?id=%d", id)
 	return cacheAsidePtr(ctx, fs.cache, key, fs.ttlLive, func(ctx context.Context) (*FootballMatchDTO, error) {
-		f, err := fs.client.Fixture(ctx, id)
+		mm, err := fs.client.Match(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		m := footballMatch(*f)
+		m := footballMatch(*mm)
 		return &m, nil
 	})
 }
 
-// Standings returns the season league table, sorted by position.
-func (fs *FootballService) Standings(ctx context.Context, seasonID int64) ([]FootballStandingDTO, error) {
-	key := fmt.Sprintf("fb:standings?season=%d", seasonID)
+// Standings returns a competition's league table (by code, e.g. "PL"), sorted.
+func (fs *FootballService) Standings(ctx context.Context, competition string) ([]FootballStandingDTO, error) {
+	key := "fb:standings?comp=" + competition
 	return cacheAside(ctx, fs.cache, key, fs.ttl, func(ctx context.Context) ([]FootballStandingDTO, error) {
-		rows, err := fs.client.StandingsBySeason(ctx, seasonID)
+		resp, err := fs.client.Standings(ctx, competition)
 		if err != nil {
 			return nil, err
 		}
-		out := make([]FootballStandingDTO, 0, len(rows))
-		for _, r := range rows {
-			out = append(out, footballStanding(r))
+		var out []FootballStandingDTO
+		for _, g := range resp.Standings {
+			if g.Type != "" && g.Type != "TOTAL" {
+				continue // prefer the overall table
+			}
+			for _, r := range g.Table {
+				out = append(out, FootballStandingDTO{
+					Position: r.Position, Team: teamLabel(r.Team), TeamID: r.Team.ID,
+					Points: r.Points, Played: r.PlayedGames, Won: r.Won, Draw: r.Draw,
+					Lost: r.Lost, GoalsFor: r.GoalsFor, GoalsAgainst: r.GoalsAgainst,
+					GoalDiff: r.GoalDifference,
+				})
+			}
+			break
 		}
 		sort.Slice(out, func(i, j int) bool { return out[i].Position < out[j].Position })
 		return out, nil
 	})
 }
 
-// Leagues returns competitions.
-func (fs *FootballService) Leagues(ctx context.Context, q url.Values) ([]FootballLeagueDTO, error) {
-	key := "fb:leagues?" + q.Encode()
-	return cacheAside(ctx, fs.cache, key, fs.ttl, func(ctx context.Context) ([]FootballLeagueDTO, error) {
-		leagues, err := fs.client.Leagues(ctx, q)
+// Leagues returns the competitions the token can access.
+func (fs *FootballService) Leagues(ctx context.Context, _ url.Values) ([]FootballLeagueDTO, error) {
+	return cacheAside(ctx, fs.cache, "fb:leagues", fs.ttl, func(ctx context.Context) ([]FootballLeagueDTO, error) {
+		comps, err := fs.client.Competitions(ctx)
 		if err != nil {
 			return nil, err
 		}
-		out := make([]FootballLeagueDTO, 0, len(leagues))
-		for _, l := range leagues {
-			out = append(out, FootballLeagueDTO{ID: l.ID, Name: l.Name, ImagePath: l.ImagePath})
+		out := make([]FootballLeagueDTO, 0, len(comps))
+		for _, c := range comps {
+			out = append(out, FootballLeagueDTO{ID: c.ID, Name: c.Name, ImagePath: c.Emblem})
 		}
 		return out, nil
 	})
@@ -122,85 +120,77 @@ func (fs *FootballService) Leagues(ctx context.Context, q url.Values) ([]Footbal
 
 // ---- mapping ----
 
-func mapFootballMatches(fx []football.Fixture) []FootballMatchDTO {
-	out := make([]FootballMatchDTO, 0, len(fx))
-	for _, f := range fx {
-		out = append(out, footballMatch(f))
+func mapFootballMatches(ms []football.Match) []FootballMatchDTO {
+	out := make([]FootballMatchDTO, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, footballMatch(m))
 	}
 	return out
 }
 
-func footballMatch(f football.Fixture) FootballMatchDTO {
-	m := FootballMatchDTO{
-		ID:         f.ID,
-		Name:       f.Name,
-		StartingAt: f.StartingAt,
-		LeagueID:   f.LeagueID,
-		SeasonID:   f.SeasonID,
+func footballMatch(m football.Match) FootballMatchDTO {
+	home, away := teamLabel(m.HomeTeam), teamLabel(m.AwayTeam)
+	d := FootballMatchDTO{
+		ID:          m.ID,
+		Name:        home + " vs " + away,
+		Status:      footballStatus(m.Status),
+		StatusShort: m.Status,
+		Live:        footballLive(m.Status),
+		StartingAt:  m.UtcDate,
+		League:      m.Competition.Name,
+		LeagueID:    m.Competition.ID,
+		HomeTeam:    home,
+		AwayTeam:    away,
+		HomeGoals:   m.Score.FullTime.Home,
+		AwayGoals:   m.Score.FullTime.Away,
 	}
-	if f.ResultInfo != nil {
-		m.ResultInfo = *f.ResultInfo
-	}
-	if f.State != nil {
-		m.Status = f.State.Name
-		m.StatusShort = f.State.State
-	}
-	for _, p := range f.Participants {
-		switch p.Meta.Location {
-		case "home":
-			m.HomeTeam = p.Name
-		case "away":
-			m.AwayTeam = p.Name
+	if m.Status == "FINISHED" {
+		switch m.Score.Winner {
+		case "HOME_TEAM":
+			d.ResultInfo = home + " won"
+		case "AWAY_TEAM":
+			d.ResultInfo = away + " won"
+		case "DRAW":
+			d.ResultInfo = "Draw"
 		}
 	}
-	// Use the CURRENT scoreline for the headline goals.
-	for _, s := range f.Scores {
-		if s.Description != "CURRENT" {
-			continue
-		}
-		goals := s.Score.Goals
-		switch s.Score.Participant {
-		case "home":
-			m.HomeGoals = &goals
-		case "away":
-			m.AwayGoals = &goals
-		}
-	}
-	return m
-}
-
-func footballStanding(s football.Standing) FootballStandingDTO {
-	d := FootballStandingDTO{Position: s.Position, Points: s.Points, TeamID: s.ParticipantID}
-	if s.Participant != nil {
-		d.Team = s.Participant.Name
-		if d.TeamID == 0 {
-			d.TeamID = s.Participant.ID
-		}
-	}
-	for _, det := range s.Details {
-		v := detailInt(det.Value)
-		switch det.TypeID {
-		case ftTypePlayed:
-			d.Played = v
-		case ftTypeWon:
-			d.Won = v
-		case ftTypeDraw:
-			d.Draw = v
-		case ftTypeLost:
-			d.Lost = v
-		case ftTypeGoalsFor:
-			d.GoalsFor = v
-		case ftTypeGoalsAgainst:
-			d.GoalsAgainst = v
-		}
-	}
-	d.GoalDiff = d.GoalsFor - d.GoalsAgainst
 	return d
 }
 
-func detailInt(n json.Number) int {
-	i, _ := n.Int64()
-	return int(i)
+func teamLabel(t football.TeamRef) string {
+	if t.ShortName != "" {
+		return t.ShortName
+	}
+	return t.Name
+}
+
+func footballLive(status string) bool {
+	switch status {
+	case "IN_PLAY", "PAUSED", "LIVE":
+		return true
+	}
+	return false
+}
+
+func footballStatus(status string) string {
+	switch status {
+	case "IN_PLAY":
+		return "In Play"
+	case "PAUSED":
+		return "Half Time"
+	case "FINISHED":
+		return "Full Time"
+	case "SCHEDULED", "TIMED":
+		return "Scheduled"
+	case "POSTPONED":
+		return "Postponed"
+	case "SUSPENDED":
+		return "Suspended"
+	case "CANCELLED":
+		return "Cancelled"
+	default:
+		return status
+	}
 }
 
 // ---- cache-aside helpers (cache-backed; independent of the cricket Service) ----

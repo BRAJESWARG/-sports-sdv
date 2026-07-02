@@ -41,7 +41,10 @@
       "Bash(gofmt -w internal/sportmonks/client.go internal/football/client.go)",
       "Bash(node --check internal/webui/web/app.js)",
       "Bash(git commit -m 'Add live scorecard detail, relative-date queries, and response timing' -m 'Live cricket cards now show batting team, both not-out batsmen \\(striker marked\\), *)",
-      "Bash(git commit -m 'Fix live badge on ended matches; tolerate per-sport fetch errors' -m '- Gate the live flag + scorecard enrichment on an actual in-play status *)"
+      "Bash(git commit -m 'Fix live badge on ended matches; tolerate per-sport fetch errors' -m '- Gate the live flag + scorecard enrichment on an actual in-play status *)",
+      "Bash(grep -vE '^\\\\s*#|^\\\\s*$' .env.example)",
+      "Bash(git commit *)",
+      "Bash(env)"
     ]
   }
 }

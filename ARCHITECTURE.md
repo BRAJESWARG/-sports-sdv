@@ -1,7 +1,7 @@
 # sports-sdv — Architecture
 
 A Go backend that wraps external sports-data providers (SportMonks **Cricket v2**
-and **Football v3**), normalizes their responses into its own DTOs, caches them,
+and **football-data.org v4**), normalizes their responses into its own DTOs, caches them,
 and re-exposes a clean REST API — plus an embedded, dependency-free **chatbot
 web UI** for querying live scores, fixtures, tables and rankings.
 
@@ -63,9 +63,9 @@ internal/sportmonks/            Provider client: SportMonks Cricket API v2.0
   client.go                       HTTP, auth (api_token query param), envelope, retry, error sanitizing
   types.go                        Upstream response types (Fixture, Run, Batting, Bowling, Standing, RankingType, ...)
 
-internal/football/              Provider client: SportMonks Football API v3
-  client.go                       HTTP, auth (Authorization header), v3 envelope, retry
-  types.go                        Upstream v3 types (inline includes, no {"data":...} wrappers)
+internal/football/              Provider client: football-data.org API v4
+  client.go                       HTTP, auth (X-Auth-Token header), per-endpoint decoding, retry
+  types.go                        Upstream v4 types (Match, Competition, StandingsResponse, ...)
 
 internal/sports/                Business layer: orchestration + mapping to public DTOs
   service.go                      Cricket service; cache-aside; live-scorecard computation
@@ -121,9 +121,9 @@ Football (namespaced `/football/`):
 | Method | Path | Query params |
 |---|---|---|
 | GET | `/api/v1/football/livescores` | — |
-| GET | `/api/v1/football/matches` | `date`, `from`, `to`, `season`, `league` |
+| GET | `/api/v1/football/matches` | `date`, `from`, `to` |
 | GET | `/api/v1/football/matches/{id}` | — |
-| GET | `/api/v1/football/standings` | `season` (required) |
+| GET | `/api/v1/football/standings` | `competition` (code, e.g. `PL`; default `PL`) |
 | GET | `/api/v1/football/leagues` | — |
 
 UI:
@@ -161,16 +161,19 @@ resources return `{"data": {...}}`; errors return `{"error": "..."}`.
 - **Rankings stats are nested** under a `ranking` object per team; the filter is
   `filter[type]` (not `tournament_type`, despite older docs).
 
-### SportMonks Football API v3 (`internal/football`)
-- **Base URL:** `https://api.sportmonks.com/v3/football`
-- **Auth:** `Authorization` header
-- **Envelope:** `{"data": ..., "pagination": ...}`
-- **Includes are inline** (no `{"data":...}` wrappers) and semicolon-separated:
-  `?include=participants;scores;state;league`
-- Requires its **own token** (separate SportMonks product from cricket).
-- **Standings stats** come from a `details` array keyed by numeric `type_id`; the
-  ids in `service_football.go` (`ftType*`) are best-effort and should be verified
-  against a live payload.
+### football-data.org API v4 (`internal/football`)
+- **Base URL:** `https://api.football-data.org/v4`
+- **Auth:** `X-Auth-Token` header — requires a **free** token (register at football-data.org)
+- **Endpoints:** `/matches?status=LIVE`, `/matches?dateFrom=&dateTo=` (dateTo is
+  **exclusive** → client passes `nextDay(to)`), `/matches/{id}`,
+  `/competitions/{code}/standings`, `/competitions`
+- **No envelope wrapper** — each endpoint returns its own object
+  (`{matches:[]}`, `{competitions:[]}`, standings object with explicit
+  `playedGames/won/draw/lost/points/goalsFor/...` fields — no `type_id` mapping needed).
+- **Standings are by competition code** (e.g. `PL`, `PD`, `BL1`), not a season id.
+- Free tier: ~10 req/min and a limited set of competitions.
+- *(Previously SportMonks Football v3 — swapped out because the cricket key
+  didn't cover football and SDV needs real-time/commercial-grade data; see §11.)*
 
 ---
 
@@ -214,8 +217,8 @@ A single-page app that turns free-text into API calls and renders **score cards*
 | `SPORTMONKS_API_TOKEN` / `API_CRICKET_KEY` | — | **Required.** Cricket token |
 | `SPORTMONKS_BASE_URL` | `https://cricket.sportmonks.com/api/v2.0` | |
 | `SPORTMONKS_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
-| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | Football token (endpoints error without it) |
-| `FOOTBALL_BASE_URL` | `https://api.sportmonks.com/v3/football` | |
+| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | football-data.org token (free; endpoints error without it) |
+| `FOOTBALL_BASE_URL` | `https://api.football-data.org/v4` | |
 | `FOOTBALL_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
 | `CACHE_TTL` | `5m` | Static data (standings, leagues, schedule) |
 | `CACHE_TTL_LIVE` | `20s` | Volatile data (livescores, today, scorecards) |
@@ -244,7 +247,9 @@ A single-page app that turns free-text into API calls and renders **score cards*
 
 - **Cricket is polling-based** (no native push) — the UI re-queries; there is no
   server→browser live streaming yet.
-- **Football needs its own token** and its standings `type_id` mapping is unverified.
+- **Football needs a (free) football-data.org token**; without it the provider
+  restricts most resources. Free tier is rate-limited (~10 req/min) and covers a
+  limited set of competitions.
 - **Whole-day historical queries can be slow** upstream (mitigated by the 30s
   timeout + a clean "timed out — try again" message).
 - **Standings season ids** are hardcoded defaults in the UI (`SEASON`) — should
@@ -290,12 +295,18 @@ A single-page app that turns free-text into API calls and renders **score cards*
 10. **Hardening** — retry (timeout-aware), 30s timeout, single-day
     `starts_between` fix, **API-key-leak fix** in error messages, and gating the
     live badge/enrichment on a real in-play status.
+11. **Football provider swap** — replaced SportMonks Football v3 with
+    **football-data.org v4** (free tier). The cricket key never covered SportMonks
+    football, and its host was unreachable on the target network; football-data.org
+    needs only a free token. DTOs/endpoints/UI stayed put — a one-package rewrite
+    plus a standings change (season id → competition code).
 
 ### Git history
 ```
-f4333fd  Fix live badge on ended matches; tolerate per-sport fetch errors
-dd5f0a2  Add live scorecard detail, relative-date queries, and response timing
-6a331ec  Remove mock/offline mode: live-only SportMonks API
+(pending)  Swap football provider to football-data.org (v4)
+f4333fd    Fix live badge on ended matches; tolerate per-sport fetch errors
+dd5f0a2    Add live scorecard detail, relative-date queries, and response timing
+6a331ec    Remove mock/offline mode: live-only SportMonks API
 (first commits)  scaffold + cricket pivot + UI + football
 ```
 Work is on branch `feature/live-sports-api`.

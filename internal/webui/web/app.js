@@ -3,8 +3,21 @@
 // Same-origin API (served by the Go backend), so no CORS and no config needed.
 const API = "";
 
-// Default season ids used by the standings shortcut (adjust to current seasons).
-const SEASON = { cricket: 1715, football: 23000 };
+// Default cricket season id for the standings shortcut (adjust to current season).
+const CRICKET_SEASON = 1715;
+
+// Map free text to a football-data.org competition code for standings.
+function footballCompetition(q) {
+  if (/premier|\bepl\b|\bpl\b/.test(q)) return "PL";
+  if (/la ?liga/.test(q)) return "PD";
+  if (/bundesliga/.test(q)) return "BL1";
+  if (/serie ?a/.test(q)) return "SA";
+  if (/ligue ?1/.test(q)) return "FL1";
+  if (/champions/.test(q)) return "CL";
+  if (/eredivisie/.test(q)) return "DED";
+  if (/primeira|portug/.test(q)) return "PPL";
+  return "PL"; // default
+}
 
 // Actual team names (used for filtering matches by team).
 const TEAMS_FOOTBALL = ["arsenal", "chelsea", "liverpool", "manchester", "man city", "tottenham", "spurs"];
@@ -145,7 +158,7 @@ async function route(query) {
   const sport = detectSport(q);
   const team = detectTeam(q);
 
-  if (/(stand|table|points)/.test(q)) return handleStandings(sport || "football");
+  if (/(stand|table|points)/.test(q)) return handleStandings(sport || "football", q);
   if (/rank/.test(q)) return handleRankings(q);
 
   // A named cricket format (test/oneday/t20) implies cricket + a type filter.
@@ -217,21 +230,28 @@ async function handleMatches(sport, action, team, format, window) {
   wireTilt(grid);
 }
 
-async function handleStandings(sport) {
-  const season = SEASON[sport];
-  const path = sport === "football" ? `/api/v1/football/standings?season=${season}` : `/api/v1/standings?season=${season}`;
+async function handleStandings(sport, q) {
+  const isFb = sport === "football";
+  let path, title;
+  if (isFb) {
+    const comp = footballCompetition(q || "");
+    path = `/api/v1/football/standings?competition=${comp}`;
+    title = `Football table (${comp})`;
+  } else {
+    path = `/api/v1/standings?season=${CRICKET_SEASON}`;
+    title = "Cricket table";
+  }
   const rows = (await api(path)).data || [];
   if (!rows.length) { addBotText("No standings available.", "err"); return; }
 
-  const isFb = sport === "football";
   const head = isFb
     ? ["#", "Team", "P", "W", "D", "L", "GD", "Pts"]
     : ["#", "Team", "P", "W", "L", "Pts"];
   const body = rows.map((r) => isFb
     ? [r.position, r.team, r.played, r.won, r.draw, r.lost, r.goalDifference, r.points]
     : [r.position, r.team, r.played, r.won, r.lost, r.points]);
-  const card = tableCard(`${cap(sport)} standings`, head, body, isFb ? [0, 2, 3, 4, 5, 6, 7] : [0, 2, 3, 4, 5]);
-  addBotNode(`${cap(sport)} table`, card);
+  const card = tableCard(title, head, body, isFb ? [0, 2, 3, 4, 5, 6, 7] : [0, 2, 3, 4, 5]);
+  addBotNode(title, card);
   wireTilt(card.parentElement || card);
 }
 
@@ -289,10 +309,10 @@ function liveDetail(m) {
 }
 
 function footballCard(m) {
-  const live = (m.statusShort || "").startsWith("INPLAY");
+  const live = m.live; // server flags IN_PLAY/PAUSED
   const c = card();
   c.innerHTML = `
-    <div class="comp"><span>⚽ Football</span>${live ? '<span class="live-badge">LIVE</span>' : `<span>${esc(m.status || m.statusShort)}</span>`}</div>
+    <div class="comp"><span>⚽ ${esc(m.league || "Football")}</span>${live ? '<span class="live-badge">LIVE</span>' : `<span>${esc(m.status || m.statusShort)}</span>`}</div>
     ${m.startingAt ? `<div class="when">📅 ${esc(fmtDateTime(m.startingAt))}</div>` : ""}
     <div class="teams">
       ${teamRow(m.homeTeam, numOrDash(m.homeGoals))}

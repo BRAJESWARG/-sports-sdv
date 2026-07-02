@@ -1,102 +1,95 @@
 package football
 
-import "encoding/json"
+// Types for the football-data.org v4 API.
+// Docs: https://docs.football-data.org/general/v4/
 
-// SportMonks Football API v3 response shapes.
-//
-// Unlike Cricket v2, v3 does NOT wrap includes in {"data": ...} — related
-// resources are inline arrays/objects on the parent. Docs:
-// https://docs.sportmonks.com/football
-
-// Fixture is a football match.
-type Fixture struct {
-	ID         int64   `json:"id"`
-	LeagueID   int64   `json:"league_id"`
-	SeasonID   int64   `json:"season_id"`
-	StateID    int     `json:"state_id"`
-	RoundID    int64   `json:"round_id"`
-	Name       string  `json:"name"` // "Home vs Away"
-	StartingAt string  `json:"starting_at"`
-	ResultInfo *string `json:"result_info"`
-
-	// includes (present only when requested via include=)
-	Participants []Participant `json:"participants,omitempty"`
-	Scores       []Score       `json:"scores,omitempty"`
-	State        *State        `json:"state,omitempty"`
-	League       *League       `json:"league,omitempty"`
-	Round        *Round        `json:"round,omitempty"`
+// Match is a football-data.org match.
+type Match struct {
+	ID          int64       `json:"id"`
+	UtcDate     string      `json:"utcDate"`
+	Status      string      `json:"status"` // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, POSTPONED, ...
+	Matchday    int         `json:"matchday"`
+	Minute      *int        `json:"minute"`
+	Competition Competition `json:"competition"`
+	Season      Season      `json:"season"`
+	HomeTeam    TeamRef     `json:"homeTeam"`
+	AwayTeam    TeamRef     `json:"awayTeam"`
+	Score       Score       `json:"score"`
 }
 
-// Participant is a team within a fixture; Meta carries home/away + result.
-type Participant struct {
-	ID        int64           `json:"id"`
-	Name      string          `json:"name"`
-	ShortCode string          `json:"short_code"`
-	ImagePath string          `json:"image_path"`
-	Meta      ParticipantMeta `json:"meta"`
+// Competition is a league/cup.
+type Competition struct {
+	ID     int64  `json:"id"`
+	Name   string `json:"name"`
+	Code   string `json:"code"` // e.g. "PL", "PD", "BL1"
+	Emblem string `json:"emblem"`
 }
 
-// ParticipantMeta describes a team's role in a fixture.
-type ParticipantMeta struct {
-	Location string `json:"location"` // "home" | "away"
-	Winner   *bool  `json:"winner"`
-	Position int    `json:"position"`
+// Season describes the season a match/standing belongs to.
+type Season struct {
+	ID              int64  `json:"id"`
+	StartDate       string `json:"startDate"`
+	EndDate         string `json:"endDate"`
+	CurrentMatchday int    `json:"currentMatchday"`
 }
 
-// Score is one scoreline entry for a fixture.
+// TeamRef is the trimmed team object used across matches/standings.
+type TeamRef struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	ShortName string `json:"shortName"`
+	Tla       string `json:"tla"`
+	Crest     string `json:"crest"`
+}
+
+// Score holds the match scoreline.
 type Score struct {
-	ParticipantID int64      `json:"participant_id"`
-	Description   string     `json:"description"` // "CURRENT", "1ST_HALF", "2ND_HALF", ...
-	Score         ScoreValue `json:"score"`
+	Winner   string     `json:"winner"` // HOME_TEAM, AWAY_TEAM, DRAW, or null
+	Duration string     `json:"duration"`
+	FullTime ScoreGoals `json:"fullTime"` // current running score during play; final at end
+	HalfTime ScoreGoals `json:"halfTime"`
 }
 
-// ScoreValue holds the goals for a participant side.
-type ScoreValue struct {
-	Goals       int    `json:"goals"`
-	Participant string `json:"participant"` // "home" | "away"
+// ScoreGoals is a home/away goal pair (nil until the match starts).
+type ScoreGoals struct {
+	Home *int `json:"home"`
+	Away *int `json:"away"`
 }
 
-// State is the match status.
-type State struct {
-	ID        int    `json:"id"`
-	State     string `json:"state"` // "NS", "INPLAY_2ND_HALF", "FT", ...
-	Name      string `json:"name"`  // "Not Started", "2nd Half", "Full Time"
-	ShortName string `json:"short_name"`
+// ---- response envelopes ----
+
+type matchesEnvelope struct {
+	Matches []Match `json:"matches"`
 }
 
-// League is a competition.
-type League struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	ImagePath string `json:"image_path"`
-	CountryID int64  `json:"country_id"`
+type competitionsEnvelope struct {
+	Competitions []Competition `json:"competitions"`
 }
 
-// Round is a matchday/round.
-type Round struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+// StandingsResponse is the /competitions/{code}/standings payload.
+type StandingsResponse struct {
+	Competition Competition      `json:"competition"`
+	Season      Season           `json:"season"`
+	Standings   []StandingsGroup `json:"standings"`
 }
 
-// Team is the trimmed team object returned by include=participant on standings.
-type Team struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	ShortCode string `json:"short_code"`
-	ImagePath string `json:"image_path"`
+// StandingsGroup is one standings table (TOTAL / HOME / AWAY).
+type StandingsGroup struct {
+	Stage string        `json:"stage"`
+	Type  string        `json:"type"`
+	Table []StandingRow `json:"table"`
 }
 
-// Standing is one row of a season standings table.
-type Standing struct {
-	Position      int              `json:"position"`
-	ParticipantID int64            `json:"participant_id"`
-	Points        int              `json:"points"`
-	Participant   *Team            `json:"participant,omitempty"` // via include=participant
-	Details       []StandingDetail `json:"details,omitempty"`     // via include=details
-}
-
-// StandingDetail is a keyed stat (played/won/... ) identified by type_id.
-type StandingDetail struct {
-	TypeID int         `json:"type_id"`
-	Value  json.Number `json:"value"`
+// StandingRow is one team's row in a standings table.
+type StandingRow struct {
+	Position       int     `json:"position"`
+	Team           TeamRef `json:"team"`
+	PlayedGames    int     `json:"playedGames"`
+	Won            int     `json:"won"`
+	Draw           int     `json:"draw"`
+	Lost           int     `json:"lost"`
+	Points         int     `json:"points"`
+	GoalsFor       int     `json:"goalsFor"`
+	GoalsAgainst   int     `json:"goalsAgainst"`
+	GoalDifference int     `json:"goalDifference"`
 }
