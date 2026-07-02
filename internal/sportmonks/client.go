@@ -23,9 +23,9 @@ import (
 	"time"
 )
 
-// logUpstream logs one line per upstream call, redacting the api_token from the
-// query so secrets never reach the logs.
-func logUpstream(provider, path string, q url.Values, status, bytes int, dur time.Duration, err error) {
+// logUpstream logs one line per upstream call — the request (api_token redacted),
+// status, and the response body (truncated) — so you can see what came back.
+func logUpstream(provider, path string, q url.Values, status int, dur time.Duration, err error, body []byte) {
 	rq := url.Values{}
 	for k, v := range q {
 		if k == "api_token" {
@@ -42,7 +42,17 @@ func logUpstream(provider, path string, q url.Values, status, bytes int, dur tim
 		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
 		return
 	}
-	slog.Info("upstream", "provider", provider, "req", req, "status", status, "bytes", bytes, "dur", dur.String())
+	slog.Info("upstream", "provider", provider, "req", req, "status", status,
+		"bytes", len(body), "response", truncate(body), "dur", dur.String())
+}
+
+// truncate renders a body for logging, capping its length.
+func truncate(b []byte) string {
+	const max = 2000
+	if len(b) <= max {
+		return string(b)
+	}
+	return string(b[:max]) + fmt.Sprintf("…(+%d bytes)", len(b)-max)
 }
 
 // Client talks to the SportMonks Cricket upstream.
@@ -113,7 +123,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	start := time.Now()
 	resp, err := doWithRetry(c.http, req)
 	if err != nil {
-		logUpstream("cricket:sportmonks", path, q, 0, 0, time.Since(start), err)
+		logUpstream("cricket:sportmonks", path, q, 0, time.Since(start), err, nil)
 		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
@@ -122,7 +132,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
-	logUpstream("cricket:sportmonks", path, q, resp.StatusCode, len(body), time.Since(start), nil)
+	logUpstream("cricket:sportmonks", path, q, resp.StatusCode, time.Since(start), nil, body)
 
 	var env envelope
 	// Ignore unmarshal error here; we fall back to raw body in the error path.
