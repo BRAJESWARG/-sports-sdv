@@ -169,20 +169,26 @@ async function handleMatches(sport, action, team, format, window) {
   const live = action === "live";
   const range = window ? `?from=${window.from}&to=${window.to}` : "";
 
-  let cricket = [], football = [];
+  // Fetch each sport independently so one failing (e.g. football with no token)
+  // doesn't kill the other.
+  let cricket = [], football = [], cricketErr = null, footballErr = null;
   if (wantCricket) {
-    let path = live ? "/api/v1/livescores" : "/api/v1/matches";
-    if (!live) {
-      if (window) path = `/api/v1/matches${range}`;
-      // Widen the window for a format query so scheduled Tests/ODIs actually appear.
-      else if (format) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
-    }
-    cricket = (await api(path)).data || [];
-    if (format) cricket = cricket.filter((m) => matchesFormat(m.type, format));
+    try {
+      let path = live ? "/api/v1/livescores" : "/api/v1/matches";
+      if (!live) {
+        if (window) path = `/api/v1/matches${range}`;
+        // Widen the window for a format query so scheduled Tests/ODIs actually appear.
+        else if (format) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
+      }
+      cricket = (await api(path)).data || [];
+      if (format) cricket = cricket.filter((m) => matchesFormat(m.type, format));
+    } catch (e) { cricketErr = e.message; }
   }
   if (wantFootball) {
-    const fpath = live ? "/api/v1/football/livescores" : `/api/v1/football/matches${range}`;
-    football = (await api(fpath)).data || [];
+    try {
+      const fpath = live ? "/api/v1/football/livescores" : `/api/v1/football/matches${range}`;
+      football = (await api(fpath)).data || [];
+    } catch (e) { footballErr = e.message; }
   }
 
   if (team) {
@@ -194,6 +200,10 @@ async function handleMatches(sport, action, team, format, window) {
   const fmt = format ? `${format} ` : "";
   const when = window ? ` ${window.label.toLowerCase()}` : "";
   if (!total) {
+    // Surface an upstream error only for the sport the user actually targeted;
+    // for an ambiguous query, ignore football's "no token" and just say none found.
+    const relevantErr = sport === "football" ? footballErr : cricketErr;
+    if (relevantErr) { addBotText("⚠️ upstream error: " + esc(relevantErr), "err"); return; }
     addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${cap(team)}”` : ""}${when}. Try “live football” or a team name.`, "err");
     return;
   }
@@ -243,7 +253,7 @@ async function handleRankings(q) {
 // ---------- card builders ----------
 
 function cricketCard(m) {
-  const live = m.live && m.status !== "NS" && m.status !== "Finished";
+  const live = m.live; // server already gates this on an in-play status
   const inns = (m.innings || []).reduce((acc, i) => (acc[i.team] = `${i.runs}/${i.wickets} (${i.overs})`, acc), {});
   const c = card();
   c.innerHTML = `

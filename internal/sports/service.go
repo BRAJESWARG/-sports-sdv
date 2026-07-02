@@ -65,10 +65,12 @@ func teamName(d *sportmonks.Data[sportmonks.Team]) string {
 // and innings totals from the localteam/visitorteam/runs includes.
 func matchFromFixture(f sportmonks.Fixture) MatchDTO {
 	m := MatchDTO{
-		ID:          f.ID,
-		Type:        f.Type,
-		Status:      f.Status,
-		Live:        f.Live,
+		ID:     f.ID,
+		Type:   f.Type,
+		Status: f.Status,
+		// SportMonks sets live=true on any fixture with live coverage (even
+		// finished/abandoned ones), so gate it on an actual in-play status.
+		Live:        f.Live && isInProgress(f.Status),
 		StartingAt:  f.StartingAt,
 		LeagueID:    f.LeagueID,
 		SeasonID:    f.SeasonID,
@@ -88,11 +90,26 @@ func matchFromFixture(f sportmonks.Fixture) MatchDTO {
 			})
 		}
 	}
-	// Enrich in-progress matches with live batting/bowling + run rates.
-	if f.Live && f.Status != "NS" && f.Status != "Finished" && !strings.Contains(f.Status, "Aband") {
+	// Enrich only genuinely in-progress matches with batting/bowling + run rates.
+	if m.Live {
 		enrichLive(&m, f, names)
 	}
 	return m
+}
+
+// isInProgress reports whether a cricket status means the match is being played
+// (i.e. not yet started, finished, abandoned, cancelled, postponed, etc.).
+func isInProgress(status string) bool {
+	s := strings.ToLower(strings.TrimSpace(status))
+	if s == "" {
+		return false
+	}
+	for _, terminal := range []string{"ns", "finish", "aban", "cancel", "cancl", "postp", "await", "awarded", "delay", "no result"} {
+		if strings.Contains(s, terminal) {
+			return false
+		}
+	}
+	return true
 }
 
 var targetRe = regexp.MustCompile(`(?i)target\s+(\d+)`)
