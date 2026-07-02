@@ -51,7 +51,10 @@
       "Bash(git commit -m 'Switch football provider to API-Football \\(api-sports.io v3\\)' -m '- Rewrite football client/types for API-Football v3 \\(x-apisports-key header, *)",
       "Bash(git commit -m 'Make football provider switchable; keep football-data.org as fallback' -m '- Restore football-data.org client as internal/footballdata \\(dormant\\) + FootballDataService *)",
       "Bash(node -e ' *)",
-      "Bash(git commit -m 'Recognize '\\\\''fifa'\\\\'' as football World Cup; add end-to-end request logging' -m '- '\\\\''fifa'\\\\'' now routes to football + World Cup \\(was falling back to both sports incl. cricket\\) *)"
+      "Bash(git commit -m 'Recognize '\\\\''fifa'\\\\'' as football World Cup; add end-to-end request logging' -m '- '\\\\''fifa'\\\\'' now routes to football + World Cup \\(was falling back to both sports incl. cricket\\) *)",
+      "Bash(gofmt -w cmd/ internal/)",
+      "Bash(grep -E '^\\(\\\\.env$|logs/\\)')",
+      "Bash(git commit -m 'Write logs to a file \\(LOG_FILE, default logs/server.log\\)' -m '- Logger writes JSON to stdout AND appends to LOG_FILE \\(default logs/server.log\\) *)"
     ]
   }
 }

@@ -11,6 +11,9 @@ import (
 type Config struct {
 	Port string
 
+	// LogFile is where JSON logs are written (in addition to stdout). Empty = stdout only.
+	LogFile string
+
 	SportmonksToken   string
 	SportmonksBaseURL string
 
@@ -34,7 +37,8 @@ type Config struct {
 // It returns an error only when a required value is missing.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port: getenv("PORT", "8090"),
+		Port:    getenv("PORT", "8090"),
+		LogFile: getenv("LOG_FILE", "logs/server.log"),
 		// Accept either SPORTMONKS_API_TOKEN or the API_CRICKET_KEY name.
 		SportmonksToken:              firstNonEmpty(os.Getenv("SPORTMONKS_API_TOKEN"), os.Getenv("API_CRICKET_KEY")),
 		SportmonksBaseURL:            getenv("SPORTMONKS_BASE_URL", "https://cricket.sportmonks.com/api/v2.0"),

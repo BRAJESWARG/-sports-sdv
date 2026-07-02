@@ -251,8 +251,9 @@ A single-page app that turns free-text into API calls and renders **score cards*
 - **Observability** — structured JSON logs: one `request` line per incoming call
   (method, path, query, status, dur) via middleware, plus one `upstream` line per
   provider call (`provider`, the exact request, status, bytes, dur) with the
-  `api_token` redacted. The browser console also logs the parsed intent and each
-  API request/response. Panics are recovered into 500s.
+  `api_token` redacted. Logs stream to stdout **and** are appended to `LOG_FILE`
+  (default `logs/server.log`, git-ignored). The browser console also logs the
+  parsed intent and each API request/response. Panics are recovered into 500s.
 
 ---
 

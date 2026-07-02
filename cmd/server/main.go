@@ -7,10 +7,12 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -24,13 +26,28 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(log) // so provider clients' slog calls share this JSON handler
-
 	cfg, err := config.Load()
 	if err != nil {
-		log.Error("config", "err", err)
+		slog.Error("config", "err", err)
 		os.Exit(1)
+	}
+
+	// Logs go to stdout and, if configured, are also appended to a file.
+	var logWriter io.Writer = os.Stdout
+	if cfg.LogFile != "" {
+		if mkErr := os.MkdirAll(filepath.Dir(cfg.LogFile), 0o755); mkErr == nil {
+			if f, ferr := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); ferr == nil {
+				defer f.Close()
+				logWriter = io.MultiWriter(os.Stdout, f)
+			} else {
+				slog.Warn("could not open log file; stdout only", "path", cfg.LogFile, "err", ferr)
+			}
+		}
+	}
+	log := slog.New(slog.NewJSONHandler(logWriter, nil))
+	slog.SetDefault(log) // so provider clients' slog calls share this JSON handler
+	if cfg.LogFile != "" {
+		log.Info("logging", "file", cfg.LogFile)
 	}
 
 	client := sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
