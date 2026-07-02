@@ -191,6 +191,27 @@ func (c *Client) MatchesBetween(ctx context.Context, from, to string) ([]Match, 
 	return env.Matches, nil
 }
 
+// MatchesByCompetition returns a competition's matches in [from, to] (inclusive
+// of `to`). Use for tournament-scoped queries, e.g. code "WC" for the World Cup.
+func (c *Client) MatchesByCompetition(ctx context.Context, code, from, to string) ([]Match, error) {
+	q := url.Values{}
+	if from != "" {
+		q.Set("dateFrom", from)
+	}
+	if to != "" {
+		q.Set("dateTo", nextDay(to)) // dateTo is exclusive upstream
+	}
+	body, err := c.get(ctx, "/competitions/"+code+"/matches", q)
+	if err != nil {
+		return nil, err
+	}
+	var env matchesEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("decode competition matches: %w", err)
+	}
+	return env.Matches, nil
+}
+
 // Match returns a single match by id.
 func (c *Client) Match(ctx context.Context, id int64) (*Match, error) {
 	body, err := c.get(ctx, "/matches/"+strconv.FormatInt(id, 10), nil)

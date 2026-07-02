@@ -27,7 +27,7 @@ func (h *FootballHandlers) livescores(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/football/matches?date=&from=&to=&season=&league=
 func (h *FootballHandlers) matches(w http.ResponseWriter, r *http.Request) {
 	q := url.Values{}
-	for _, k := range []string{"date", "from", "to", "season", "league"} {
+	for _, k := range []string{"date", "from", "to", "competition"} {
 		if v := r.URL.Query().Get(k); v != "" {
 			q.Set(k, v)
 		}

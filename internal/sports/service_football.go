@@ -40,20 +40,27 @@ func (fs *FootballService) Livescores(ctx context.Context) ([]FootballMatchDTO, 
 // Matches returns matches (schedule & results). Honors date / from+to; with no
 // filter it defaults to the next 7 days.
 func (fs *FootballService) Matches(ctx context.Context, q url.Values) ([]FootballMatchDTO, error) {
-	date, from, to := q.Get("date"), q.Get("from"), q.Get("to")
+	date, from, to, comp := q.Get("date"), q.Get("from"), q.Get("to"), q.Get("competition")
 	key := "fb:matches?" + q.Encode()
 	ttl := fs.ttl
 	return cacheAside(ctx, fs.cache, key, ttl, func(ctx context.Context) ([]FootballMatchDTO, error) {
-		var ms []football.Match
-		var err error
+		// Resolve the date window (default: next 7 days).
+		var f0, t0 string
 		switch {
 		case date != "":
-			ms, err = fs.client.MatchesBetween(ctx, date, date)
+			f0, t0 = date, date
 		case from != "" && to != "":
-			ms, err = fs.client.MatchesBetween(ctx, from, to)
+			f0, t0 = from, to
 		default:
 			now := time.Now().UTC()
-			ms, err = fs.client.MatchesBetween(ctx, now.Format("2006-01-02"), now.AddDate(0, 0, 7).Format("2006-01-02"))
+			f0, t0 = now.Format("2006-01-02"), now.AddDate(0, 0, 7).Format("2006-01-02")
+		}
+		var ms []football.Match
+		var err error
+		if comp != "" {
+			ms, err = fs.client.MatchesByCompetition(ctx, comp, f0, t0)
+		} else {
+			ms, err = fs.client.MatchesBetween(ctx, f0, t0)
 		}
 		if err != nil {
 			return nil, err

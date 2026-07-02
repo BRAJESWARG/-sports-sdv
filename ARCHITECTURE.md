@@ -121,7 +121,7 @@ Football (namespaced `/football/`):
 | Method | Path | Query params |
 |---|---|---|
 | GET | `/api/v1/football/livescores` | — |
-| GET | `/api/v1/football/matches` | `date`, `from`, `to` |
+| GET | `/api/v1/football/matches` | `date`, `from`, `to`, `competition` (code, e.g. `WC`) |
 | GET | `/api/v1/football/matches/{id}` | — |
 | GET | `/api/v1/football/standings` | `competition` (code, e.g. `PL`; default `PL`) |
 | GET | `/api/v1/football/leagues` | — |

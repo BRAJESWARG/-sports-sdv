@@ -113,6 +113,9 @@ function detectCompetition(q) {
   return COMPETITIONS.find((c) => c.re.test(q)) || null;
 }
 
+// football-data.org competition codes for competitions that exist in football.
+const FB_COMP_CODE = { "World Cup": "WC", "Champions League": "CL" };
+
 // Map free-text cricket format to a ranking type (TEST / ODI / T20I).
 // Understands synonyms: "oneday", "one day", "50 over" -> ODI; "twenty20" -> T20I.
 function rankingType(q) {
@@ -215,7 +218,15 @@ async function handleMatches(sport, action, team, format, window, comp) {
   }
   if (wantFootball) {
     try {
-      const fpath = live ? "/api/v1/football/livescores" : `/api/v1/football/matches${range}`;
+      let fpath = "/api/v1/football/livescores";
+      if (!live) {
+        const p = new URLSearchParams();
+        if (window) { p.set("from", window.from); p.set("to", window.to); }
+        const code = comp ? FB_COMP_CODE[comp.label] : null; // e.g. World Cup -> WC
+        if (code) p.set("competition", code);
+        const qs = p.toString();
+        fpath = `/api/v1/football/matches${qs ? "?" + qs : ""}`;
+      }
       football = (await api(fpath)).data || [];
     } catch (e) { footballErr = e.message; }
   }
