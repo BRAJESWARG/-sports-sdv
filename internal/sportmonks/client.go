@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +22,28 @@ import (
 	"strings"
 	"time"
 )
+
+// logUpstream logs one line per upstream call, redacting the api_token from the
+// query so secrets never reach the logs.
+func logUpstream(provider, path string, q url.Values, status, bytes int, dur time.Duration, err error) {
+	rq := url.Values{}
+	for k, v := range q {
+		if k == "api_token" {
+			rq.Set(k, "***")
+		} else {
+			rq[k] = v
+		}
+	}
+	req := path
+	if len(rq) > 0 {
+		req = path + "?" + rq.Encode()
+	}
+	if err != nil {
+		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
+		return
+	}
+	slog.Info("upstream", "provider", provider, "req", req, "status", status, "bytes", bytes, "dur", dur.String())
+}
 
 // Client talks to the SportMonks Cricket upstream.
 type Client struct {
@@ -87,8 +110,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	}
 	req.Header.Set("Accept", "application/json")
 
+	start := time.Now()
 	resp, err := doWithRetry(c.http, req)
 	if err != nil {
+		logUpstream("cricket:sportmonks", path, q, 0, 0, time.Since(start), err)
 		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
@@ -97,6 +122,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
+	logUpstream("cricket:sportmonks", path, q, resp.StatusCode, len(body), time.Since(start), nil)
 
 	var env envelope
 	// Ignore unmarshal error here; we fall back to raw body in the error path.

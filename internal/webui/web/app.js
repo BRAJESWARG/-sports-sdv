@@ -25,7 +25,7 @@ const TEAMS_CRICKET = ["india", "england", "australia", "sweden", "portugal", "s
   "new zealand", "sri lanka", "bangladesh", "pakistan", "west indies", "zimbabwe", "ireland", "afghanistan"];
 
 // Sport-detection keywords = sport words + the team names (NOT used as team filters).
-const KW_FOOTBALL = ["football", "soccer", "goal", "premier", "epl", "la liga", "bundesliga", ...TEAMS_FOOTBALL];
+const KW_FOOTBALL = ["football", "soccer", "goal", "fifa", "premier", "epl", "la liga", "bundesliga", ...TEAMS_FOOTBALL];
 const KW_CRICKET = ["cricket", "t20", "odi", "test", "wicket", "innings", "ipl", ...TEAMS_CRICKET];
 
 const $thread = document.getElementById("thread");
@@ -79,8 +79,13 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // ---------- api ----------
 
 async function api(path) {
+  const t0 = performance.now();
+  console.log("%c→ REQUEST", "color:#5b8cff", "GET " + API + path);
   const res = await fetch(API + path);
   const body = await res.json().catch(() => ({}));
+  const ms = Math.round(performance.now() - t0);
+  const summary = body.count !== undefined ? `${body.count} items` : (body.error ? "error: " + body.error : "ok");
+  console.log("%c← RESPONSE", "color:#38e8b0", `${res.status} ${path} · ${summary} · ${ms}ms`, body);
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
   return body;
 }
@@ -101,7 +106,7 @@ function detectTeam(q) {
 // Named competitions/tournaments. `re` matches both the query and the upstream
 // league name, so we can filter matches to a tournament (and say when none run).
 const COMPETITIONS = [
-  { label: "World Cup", re: /world ?cup/ },
+  { label: "World Cup", re: /world ?cup|fifa/ },
   { label: "Champions Trophy", re: /champions trophy/ },
   { label: "IPL", re: /\bipl\b|indian premier/ },
   { label: "The Hundred", re: /the hundred|\bhundred\b/ },
@@ -190,6 +195,12 @@ async function route(query) {
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
   else if (/(live|score|now|playing)/.test(q)) action = "live";
   else if (team || format || comp) action = "matches";
+
+  console.log("%c⟐ INTENT", "color:#f0b429", {
+    query, sport: effSport || "both", action,
+    team: team || null, format: format || null,
+    competition: comp ? comp.label : null, window: window ? window.label : null,
+  });
   return handleMatches(effSport, action, team, format, window, comp);
 }
 

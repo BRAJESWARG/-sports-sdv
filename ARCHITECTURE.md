@@ -248,8 +248,11 @@ A single-page app that turns free-text into API calls and renders **score cards*
 - **Error hygiene** — transport errors are mapped to a clean `APIError`; the
   request URL (which carries the token) is **never** surfaced to clients. HTML
   responses (proxy/gateway interception) are detected and reported as such.
-- **Observability** — structured JSON request logs (method, path, status, dur)
-  via middleware; panics are recovered into 500s.
+- **Observability** — structured JSON logs: one `request` line per incoming call
+  (method, path, query, status, dur) via middleware, plus one `upstream` line per
+  provider call (`provider`, the exact request, status, bytes, dur) with the
+  `api_token` redacted. The browser console also logs the parsed intent and each
+  API request/response. Panics are recovered into 500s.
 
 ---
 

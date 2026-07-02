@@ -27,6 +27,7 @@ func logging(log *slog.Logger, next http.Handler) http.Handler {
 		log.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,
+			"query", r.URL.RawQuery,
 			"status", rec.status,
 			"dur", time.Since(start).String(),
 		)

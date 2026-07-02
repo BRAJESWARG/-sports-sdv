@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +22,20 @@ import (
 	"strings"
 	"time"
 )
+
+// logUpstream logs one line per upstream call. The API key travels in a header,
+// so the query is safe to log as-is.
+func logUpstream(provider, path string, q url.Values, status, bytes int, dur time.Duration, err error) {
+	req := path
+	if len(q) > 0 {
+		req = path + "?" + q.Encode()
+	}
+	if err != nil {
+		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
+		return
+	}
+	slog.Info("upstream", "provider", provider, "req", req, "status", status, "bytes", bytes, "dur", dur.String())
+}
 
 // Client talks to the API-Football upstream.
 type Client struct {
@@ -77,8 +92,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	req.Header.Set("x-apisports-key", c.key)
 	req.Header.Set("Accept", "application/json")
 
+	start := time.Now()
 	resp, err := doWithRetry(c.http, req)
 	if err != nil {
+		logUpstream("football:api-football", path, q, 0, 0, time.Since(start), err)
 		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
@@ -87,6 +104,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
+	logUpstream("football:api-football", path, q, resp.StatusCode, len(body), time.Since(start), nil)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: summarizeBody(body)}

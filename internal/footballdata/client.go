@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -63,6 +64,20 @@ type errBody struct {
 	ErrorCode int    `json:"errorCode"`
 }
 
+// logUpstream logs one line per upstream call. The token travels in a header,
+// so the query is safe to log as-is.
+func logUpstream(provider, path string, q url.Values, status, bytes int, dur time.Duration, err error) {
+	req := path
+	if len(q) > 0 {
+		req = path + "?" + q.Encode()
+	}
+	if err != nil {
+		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
+		return
+	}
+	slog.Info("upstream", "provider", provider, "req", req, "status", status, "bytes", bytes, "dur", dur.String())
+}
+
 // get performs a GET against path and returns the raw response body.
 func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, error) {
 	u := c.baseURL + path
@@ -76,8 +91,10 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	req.Header.Set("X-Auth-Token", c.token)
 	req.Header.Set("Accept", "application/json")
 
+	start := time.Now()
 	resp, err := doWithRetry(c.http, req)
 	if err != nil {
+		logUpstream("football:football-data.org", path, q, 0, 0, time.Since(start), err)
 		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
@@ -86,6 +103,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
+	logUpstream("football:football-data.org", path, q, resp.StatusCode, len(body), time.Since(start), nil)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var e errBody
