@@ -43,7 +43,7 @@ func Load() (*Config, error) {
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
 		CacheTTLLive:                 getdur("CACHE_TTL_LIVE", 20*time.Second),
-		UpstreamTimeout:              getdur("UPSTREAM_TIMEOUT", 10*time.Second),
+		UpstreamTimeout:              getdur("UPSTREAM_TIMEOUT", 30*time.Second),
 	}
 
 	if cfg.SportmonksToken == "" {

@@ -26,6 +26,15 @@ type MatchDTO struct {
 	LocalTeam   string       `json:"localTeam"`
 	VisitorTeam string       `json:"visitorTeam"`
 	Innings     []InningsDTO `json:"innings,omitempty"`
+
+	// Live-only enrichment (populated for in-progress matches).
+	BattingTeam string       `json:"battingTeam,omitempty"`
+	Overs       float64      `json:"overs,omitempty"`           // current innings overs (X.Y)
+	CRR         float64      `json:"currentRunRate,omitempty"`  // current run rate
+	RRR         float64      `json:"requiredRunRate,omitempty"` // required run rate (chase)
+	Required    int          `json:"requiredRuns,omitempty"`    // runs still needed (chase)
+	Batsmen     []BattingDTO `json:"batsmen,omitempty"`         // current not-out pair
+	Bowler      *BowlingDTO  `json:"bowler,omitempty"`          // current bowler
 }
 
 // BattingDTO is one batsman's scorecard line.
@@ -37,6 +46,7 @@ type BattingDTO struct {
 	Fours      int     `json:"fours"`
 	Sixes      int     `json:"sixes"`
 	StrikeRate float64 `json:"strikeRate"`
+	OnStrike   bool    `json:"onStrike,omitempty"` // live: currently on strike
 }
 
 // BowlingDTO is one bowler's scorecard line.

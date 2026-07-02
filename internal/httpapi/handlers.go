@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/bgmaster/sports-sdv/internal/football"
 	"github.com/bgmaster/sports-sdv/internal/sportmonks"
@@ -130,10 +131,13 @@ func (h *Handlers) leagues(w http.ResponseWriter, r *http.Request) {
 // filter[...] syntax, forwarding only known keys.
 func buildFixtureFilters(src url.Values) url.Values {
 	out := url.Values{}
+	// SportMonks treats the end of starts_between as midnight, so a same-day
+	// range (from==to) would exclude that day's fixtures. Extend the end by one
+	// day so the whole `to` day is covered.
 	if date := src.Get("date"); date != "" {
-		out.Set("filter[starts_between]", date+","+date)
+		out.Set("filter[starts_between]", date+","+nextDay(date))
 	} else if from, to := src.Get("from"), src.Get("to"); from != "" && to != "" {
-		out.Set("filter[starts_between]", from+","+to)
+		out.Set("filter[starts_between]", from+","+nextDay(to))
 	}
 	if v := src.Get("league"); v != "" {
 		out.Set("filter[league_id]", v)
@@ -145,4 +149,13 @@ func buildFixtureFilters(src url.Values) url.Values {
 		out.Set("filter[localteam_id]", v)
 	}
 	return out
+}
+
+// nextDay returns the day after a YYYY-MM-DD date (unchanged if unparseable).
+func nextDay(d string) string {
+	t, err := time.Parse("2006-01-02", d)
+	if err != nil {
+		return d
+	}
+	return t.AddDate(0, 0, 1).Format("2006-01-02")
 }

@@ -127,6 +127,19 @@ function fmtDateTime(s) {
   return d.toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+// Parse a relative date range from the query, or null for the default window.
+function parseDateWindow(q) {
+  const day = (o) => isoDate(o);
+  if (/\byesterday\b/.test(q)) return { from: day(-1), to: day(-1), label: "Yesterday" };
+  if (/\btomorrow\b/.test(q)) return { from: day(1), to: day(1), label: "Tomorrow" };
+  if (/\btoday\b/.test(q)) return { from: day(0), to: day(0), label: "Today" };
+  if (/last week|past week|last 7 days|last seven days/.test(q)) return { from: day(-7), to: day(0), label: "Last 7 days" };
+  if (/next week/.test(q)) return { from: day(7), to: day(14), label: "Next week" };
+  if (/this week/.test(q)) return { from: day(0), to: day(7), label: "This week" };
+  if (/\b(results?|recent|past)\b/.test(q)) return { from: day(-7), to: day(0), label: "Recent results" };
+  return null;
+}
+
 async function route(query) {
   const q = query.toLowerCase().trim();
   const sport = detectSport(q);
@@ -138,32 +151,38 @@ async function route(query) {
   // A named cricket format (test/oneday/t20) implies cricket + a type filter.
   const format = detectFormat(q);
   const effSport = format ? "cricket" : sport;
+  const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
 
   let action = "live";
-  if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
+  if (window) action = "matches"; // a dated query is about fixtures/results
+  else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
   else if (/(live|score|now|playing)/.test(q)) action = "live";
   else if (team || format) action = "matches"; // bare team/format -> show fixtures
-  return handleMatches(effSport, action, team, format);
+  return handleMatches(effSport, action, team, format, window);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, team, format) {
+async function handleMatches(sport, action, team, format, window) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
+  const range = window ? `?from=${window.from}&to=${window.to}` : "";
 
   let cricket = [], football = [];
   if (wantCricket) {
     let path = live ? "/api/v1/livescores" : "/api/v1/matches";
-    // Widen the window for a format query so scheduled Tests/ODIs actually appear
-    // (the default is only the next 7 days).
-    if (!live && format) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
+    if (!live) {
+      if (window) path = `/api/v1/matches${range}`;
+      // Widen the window for a format query so scheduled Tests/ODIs actually appear.
+      else if (format) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
+    }
     cricket = (await api(path)).data || [];
     if (format) cricket = cricket.filter((m) => matchesFormat(m.type, format));
   }
   if (wantFootball) {
-    football = (await api(live ? "/api/v1/football/livescores" : "/api/v1/football/matches")).data || [];
+    const fpath = live ? "/api/v1/football/livescores" : `/api/v1/football/matches${range}`;
+    football = (await api(fpath)).data || [];
   }
 
   if (team) {
@@ -173,8 +192,9 @@ async function handleMatches(sport, action, team, format) {
 
   const total = cricket.length + football.length;
   const fmt = format ? `${format} ` : "";
+  const when = window ? ` ${window.label.toLowerCase()}` : "";
   if (!total) {
-    addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${cap(team)}”` : ""}. Try “live football” or a team name.`, "err");
+    addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${cap(team)}”` : ""}${when}. Try “live football” or a team name.`, "err");
     return;
   }
 
@@ -182,7 +202,7 @@ async function handleMatches(sport, action, team, format) {
   grid.className = "cards" + (total > 1 ? " two" : "");
   cricket.forEach((m) => grid.appendChild(cricketCard(m)));
   football.forEach((m) => grid.appendChild(footballCard(m)));
-  const label = live ? "Live now" : `${fmt}Fixtures & results`;
+  const label = live ? "Live now" : window ? `${fmt}${window.label}` : `${fmt}Fixtures & results`;
   addBotNode(`${label} — ${total} match${total > 1 ? "es" : ""}${team ? ` · ${cap(team)}` : ""}`, grid);
   wireTilt(grid);
 }
@@ -234,8 +254,28 @@ function cricketCard(m) {
       <div class="divider"></div>
       ${teamRow(m.visitorTeam, inns[m.visitorTeam])}
     </div>
+    ${live ? liveDetail(m) : ""}
     ${m.note ? `<div class="result">🏆 ${esc(m.note)}</div>` : ""}`;
   return c;
+}
+
+// Live scorecard block: batting team, current batsmen, bowler, run rates.
+function liveDetail(m) {
+  const rates = [];
+  if (m.battingTeam) rates.push(`<b>${esc(m.battingTeam)}</b> batting`);
+  if (m.currentRunRate) rates.push(`CRR ${m.currentRunRate}`);
+  if (m.requiredRunRate) rates.push(`RRR ${m.requiredRunRate}`);
+  if (m.requiredRuns) rates.push(`Need <b>${m.requiredRuns}</b>`);
+  const rateLine = rates.length ? `<div class="rates">${rates.join(" · ")}</div>` : "";
+
+  const bats = (m.batsmen || []).map((b) =>
+    `<div class="pl">🏏 ${esc(b.player || "—")}${b.onStrike ? " <em>*</em>" : ""} <span>${b.runs} (${b.balls})</span></div>`).join("");
+  const bowl = m.bowler
+    ? `<div class="pl">🎯 ${esc(m.bowler.player || "—")} <span>${m.bowler.wickets}/${m.bowler.runs} (${m.bowler.overs})</span></div>`
+    : "";
+
+  if (!rateLine && !bats && !bowl) return "";
+  return `<div class="live-detail">${rateLine}${bats}${bowl}</div>`;
 }
 
 function footballCard(m) {
@@ -289,13 +329,26 @@ function wireTilt(scope) {
 async function handle(query) {
   addUser(query);
   const typing = addTyping();
+  const t0 = performance.now();
+  let ok = true;
   try {
     await route(query);
   } catch (e) {
+    ok = false;
     addBotText("⚠️ " + esc(e.message), "err");
   } finally {
     typing.remove();
+    addTiming(Math.round(performance.now() - t0), ok);
   }
+}
+
+// Show how long the query took (round-trip incl. the upstream API call).
+function addTiming(ms, ok) {
+  const el = div("timing", "");
+  const t = ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms} ms`;
+  el.textContent = `${ok ? "⚡" : "⏱"} responded in ${t}`;
+  $thread.appendChild(el);
+  scroll();
 }
 
 $form.addEventListener("submit", (e) => {

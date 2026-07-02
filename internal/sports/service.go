@@ -9,8 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bgmaster/sports-sdv/internal/cache"
@@ -84,8 +88,162 @@ func matchFromFixture(f sportmonks.Fixture) MatchDTO {
 			})
 		}
 	}
+	// Enrich in-progress matches with live batting/bowling + run rates.
+	if f.Live && f.Status != "NS" && f.Status != "Finished" && !strings.Contains(f.Status, "Aband") {
+		enrichLive(&m, f, names)
+	}
 	return m
 }
+
+var targetRe = regexp.MustCompile(`(?i)target\s+(\d+)`)
+
+// enrichLive computes the current batting team, batsmen, bowler, over count, and
+// current/required run rates for an in-progress match.
+func enrichLive(m *MatchDTO, f sportmonks.Fixture, names map[int]string) {
+	if f.Runs == nil || len(f.Runs.Data) == 0 {
+		return
+	}
+	// Current innings = the one with the highest inning number.
+	var cur sportmonks.Run
+	for i, r := range f.Runs.Data {
+		if i == 0 || r.Inning > cur.Inning {
+			cur = r
+		}
+	}
+	if cur.Overs <= 0 {
+		return
+	}
+	m.BattingTeam = names[cur.TeamID]
+	m.Overs = cur.Overs
+	dec := oversToDecimal(cur.Overs)
+	if dec > 0 {
+		m.CRR = round2(float64(cur.Score) / dec)
+	}
+	sb := "S" + strconv.Itoa(cur.Inning)
+
+	// Current batsmen = current-innings entries that have not fallen
+	// (fow_score/fow_balls both 0). The striker (active) is listed first.
+	if f.Batting != nil {
+		var atCrease []sportmonks.Batting
+		for _, b := range f.Batting.Data {
+			if b.Scoreboard == sb && b.FowScore == 0 && b.FowBalls == 0 {
+				atCrease = append(atCrease, b)
+			}
+		}
+		sort.SliceStable(atCrease, func(i, j int) bool { return atCrease[i].Active && !atCrease[j].Active })
+		for i, b := range atCrease {
+			if i >= 2 {
+				break
+			}
+			name := ""
+			if b.Batsman != nil {
+				name = b.Batsman.Data.Fullname
+			}
+			m.Batsmen = append(m.Batsmen, BattingDTO{
+				Player: name, TeamID: b.TeamID, Runs: b.Score,
+				Balls: b.Ball, Fours: b.FourX, Sixes: b.SixX, StrikeRate: b.Rate,
+				OnStrike: b.Active,
+			})
+		}
+	}
+
+	// Current bowler: active -> mid-over (fractional overs) -> latest by sort.
+	if f.Bowling != nil {
+		var pick *sportmonks.Bowling
+		for i := range f.Bowling.Data {
+			b := &f.Bowling.Data[i]
+			if b.Scoreboard == sb && b.Active {
+				pick = b
+				break
+			}
+		}
+		if pick == nil {
+			for i := range f.Bowling.Data {
+				b := &f.Bowling.Data[i]
+				if b.Scoreboard == sb && b.Overs != math.Floor(b.Overs) {
+					pick = b
+					break
+				}
+			}
+		}
+		if pick == nil {
+			for i := range f.Bowling.Data {
+				b := &f.Bowling.Data[i]
+				if b.Scoreboard == sb && (pick == nil || b.Sort > pick.Sort) {
+					pick = b
+				}
+			}
+		}
+		if pick != nil {
+			name := ""
+			if pick.Bowler != nil {
+				name = pick.Bowler.Data.Fullname
+			}
+			m.Bowler = &BowlingDTO{
+				Player: name, TeamID: pick.TeamID, Overs: pick.Overs,
+				Runs: pick.Runs, Wickets: pick.Wickets, Economy: pick.Rate,
+			}
+		}
+	}
+
+	// Chase math: required runs + required run rate.
+	if cur.Inning >= 2 {
+		target := 0
+		if mt := targetRe.FindStringSubmatch(f.Note); len(mt) == 2 {
+			target, _ = strconv.Atoi(mt[1])
+		}
+		if target == 0 {
+			for _, r := range f.Runs.Data {
+				if r.Inning == 1 {
+					target = r.Score + 1
+				}
+			}
+		}
+		if target > 0 {
+			req := target - cur.Score
+			if req < 0 {
+				req = 0
+			}
+			m.Required = req
+			matchOvers := typeOvers(f.Type)
+			if matchOvers == 0 {
+				for _, r := range f.Runs.Data {
+					if r.Inning == 1 && r.Overs > matchOvers {
+						matchOvers = r.Overs
+					}
+				}
+			}
+			if rem := matchOvers - dec; rem > 0 {
+				m.RRR = round2(float64(req) / rem)
+			}
+		}
+	}
+}
+
+// oversToDecimal converts cricket overs (X.Y where Y is balls 0-5) to decimal overs.
+func oversToDecimal(o float64) float64 {
+	whole := math.Floor(o)
+	balls := math.Round((o - whole) * 10)
+	if balls > 5 {
+		balls = 5
+	}
+	return whole + balls/6.0
+}
+
+// typeOvers returns the innings over-limit for a match type, or 0 if unknown.
+func typeOvers(t string) float64 {
+	u := strings.ToUpper(t)
+	switch {
+	case strings.Contains(u, "T20"):
+		return 20
+	case strings.Contains(u, "ODI"), strings.Contains(u, "OD"), strings.Contains(u, "50"):
+		return 50
+	default:
+		return 0
+	}
+}
+
+func round2(f float64) float64 { return math.Round(f*100) / 100 }
 
 // teamNameMap builds a team-id -> name lookup from the localteam/visitorteam includes.
 func teamNameMap(f sportmonks.Fixture) map[int]string {

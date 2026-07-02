@@ -130,6 +130,14 @@ body {
 .divider { height: 1px; background: var(--panel-brd); margin: 4px 0; }
 .result { margin-top: 8px; font-size: 13px; color: var(--accent2); }
 
+/* Live scorecard detail */
+.live-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--panel-brd); }
+.live-detail .rates { font-size: 12.5px; color: var(--txt); margin-bottom: 6px; }
+.live-detail .rates b { color: var(--accent2); }
+.live-detail .pl { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 2px 0; }
+.live-detail .pl span { color: var(--txt); font-weight: 600; }
+.live-detail .pl em { color: var(--live); font-style: normal; font-weight: 700; } /* striker * */
+
 .live-badge {
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--live); font-weight: 700; font-size: 12px;
@@ -171,3 +179,13 @@ table.tbl tr:hover td { background: rgba(255, 255, 255, 0.03); }
 }
 .composer button:active { transform: scale(0.96); }
 .err { color: #ffb4c0; }
+
+/* Per-query response time */
+.timing {
+  align-self: flex-start;
+  margin: -6px 0 2px 4px;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+}

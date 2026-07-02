@@ -11,8 +11,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -79,9 +81,9 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	req.Header.Set("Authorization", c.token)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := doWithRetry(c.http, req)
 	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
+		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
 
@@ -122,6 +124,39 @@ func summarizeBody(b []byte) string {
 		return string(t[:300]) + "…"
 	}
 	return string(t)
+}
+
+// doWithRetry performs the request, retrying once on a transient transport
+// error after a short backoff. Timeouts are NOT retried (that just doubles the
+// wait). GET requests are safe to retry.
+func doWithRetry(cl *http.Client, req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < 2; attempt++ {
+		resp, err = cl.Do(req.Clone(req.Context()))
+		if err == nil {
+			return resp, nil
+		}
+		var nerr net.Error
+		if errors.As(err, &nerr) && nerr.Timeout() {
+			break
+		}
+		if attempt == 0 {
+			time.Sleep(400 * time.Millisecond)
+		}
+	}
+	return nil, err
+}
+
+// transportError maps a network failure to a clean APIError. It never includes
+// the request URL, which carries the token.
+func transportError(path string, err error) *APIError {
+	msg := "could not reach SportMonks"
+	var nerr net.Error
+	if errors.As(err, &nerr) && nerr.Timeout() {
+		msg = "SportMonks request timed out — please try again"
+	}
+	return &APIError{Endpoint: path, Message: msg}
 }
 
 // inc builds a query with a v3 include list (semicolon-separated).

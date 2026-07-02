@@ -89,27 +89,35 @@ type Run struct {
 
 // Batting is one batsman's line in the scorecard (via include=batting).
 type Batting struct {
-	TeamID   int           `json:"team_id"`
-	PlayerID int           `json:"player_id"`
-	Score    int           `json:"score"`
-	Ball     int           `json:"ball"`
-	FourX    int           `json:"four_x"`
-	SixX     int           `json:"six_x"`
-	Rate     float64       `json:"rate"`
-	Batsman  *Data[Player] `json:"batsman,omitempty"` // via include=batting.batsman
+	TeamID     int           `json:"team_id"`
+	PlayerID   int           `json:"player_id"`
+	Score      int           `json:"score"`
+	Ball       int           `json:"ball"`
+	FourX      int           `json:"four_x"`
+	SixX       int           `json:"six_x"`
+	Rate       float64       `json:"rate"`
+	Active     bool          `json:"active"`     // true only for the striker
+	Scoreboard string        `json:"scoreboard"` // "S1" (1st innings), "S2" (2nd), ...
+	Sort       int           `json:"sort"`
+	FowScore   int           `json:"fow_score"` // team score at fall of wicket; 0 => not out
+	FowBalls   float64       `json:"fow_balls"` // over at fall of wicket; 0 => not out
+	Batsman    *Data[Player] `json:"batsman,omitempty"`
 }
 
 // Bowling is one bowler's line in the scorecard (via include=bowling).
 type Bowling struct {
-	TeamID   int           `json:"team_id"`
-	PlayerID int           `json:"player_id"`
-	Overs    float64       `json:"overs"`
-	Runs     int           `json:"runs"`
-	Wickets  int           `json:"wickets"`
-	Wide     int           `json:"wide"`
-	Noball   int           `json:"noball"`
-	Rate     float64       `json:"rate"`             // economy
-	Bowler   *Data[Player] `json:"bowler,omitempty"` // via include=bowling.bowler
+	TeamID     int           `json:"team_id"`
+	PlayerID   int           `json:"player_id"`
+	Overs      float64       `json:"overs"`
+	Runs       int           `json:"runs"`
+	Wickets    int           `json:"wickets"`
+	Wide       int           `json:"wide"`
+	Noball     int           `json:"noball"`
+	Rate       float64       `json:"rate"`       // economy
+	Active     bool          `json:"active"`     // currently bowling
+	Scoreboard string        `json:"scoreboard"` // "S1", "S2", ...
+	Sort       int           `json:"sort"`
+	Bowler     *Data[Player] `json:"bowler,omitempty"`
 }
 
 // Standing is one row of a season standings table (/standings/season/{id}).

@@ -11,8 +11,10 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -85,9 +87,9 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.http.Do(req)
+	resp, err := doWithRetry(c.http, req)
 	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
+		return nil, transportError(path, err)
 	}
 	defer resp.Body.Close()
 
@@ -140,6 +142,39 @@ func summarizeBody(b []byte) string {
 	return string(t)
 }
 
+// doWithRetry performs the request, retrying once on a transient transport
+// error after a short backoff. Timeouts are NOT retried (that just doubles the
+// wait). GET requests are safe to retry.
+func doWithRetry(cl *http.Client, req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	for attempt := 0; attempt < 2; attempt++ {
+		resp, err = cl.Do(req.Clone(req.Context()))
+		if err == nil {
+			return resp, nil
+		}
+		var nerr net.Error
+		if errors.As(err, &nerr) && nerr.Timeout() {
+			break
+		}
+		if attempt == 0 {
+			time.Sleep(400 * time.Millisecond)
+		}
+	}
+	return nil, err
+}
+
+// transportError maps a network failure to a clean APIError. It never includes
+// the request URL, which carries the api_token.
+func transportError(path string, err error) *APIError {
+	msg := "could not reach SportMonks"
+	var nerr net.Error
+	if errors.As(err, &nerr) && nerr.Timeout() {
+		msg = "SportMonks request timed out — please try again"
+	}
+	return &APIError{Endpoint: path, Message: msg}
+}
+
 // withIncludes returns a copy of q with the include param set (if non-empty).
 func withIncludes(q url.Values, includes ...string) url.Values {
 	out := url.Values{}
@@ -152,9 +187,11 @@ func withIncludes(q url.Values, includes ...string) url.Values {
 	return out
 }
 
-// Livescores returns matches currently in play or scheduled for today.
+// Livescores returns matches currently in play or scheduled for today, with
+// enough detail (batting/bowling) to build a live scorecard.
 func (c *Client) Livescores(ctx context.Context, q url.Values) ([]Fixture, error) {
-	raw, err := c.get(ctx, "/livescores", withIncludes(q, "localteam", "visitorteam", "runs"))
+	raw, err := c.get(ctx, "/livescores", withIncludes(q,
+		"localteam", "visitorteam", "runs", "batting.batsman", "bowling.bowler"))
 	if err != nil {
 		return nil, err
 	}

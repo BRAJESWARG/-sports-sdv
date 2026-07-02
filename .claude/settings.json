@@ -36,7 +36,10 @@
       "Bash(git check-ignore *)",
       "Bash(git checkout *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'Remove mock/offline mode: live-only SportMonks API' -m '- Delete embedded sample fixtures for cricket \\(v2\\) and football \\(v3\\) *)"
+      "Bash(git commit -m 'Remove mock/offline mode: live-only SportMonks API' -m '- Delete embedded sample fixtures for cricket \\(v2\\) and football \\(v3\\) *)",
+      "Bash(python3 -)",
+      "Bash(gofmt -w internal/sportmonks/client.go internal/football/client.go)",
+      "Bash(node --check internal/webui/web/app.js)"
     ]
   }
 }
