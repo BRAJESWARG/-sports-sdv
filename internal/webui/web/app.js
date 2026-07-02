@@ -301,9 +301,13 @@ async function handleRankings(q) {
 function cricketCard(m) {
   const live = m.live; // server already gates this on an in-play status
   const inns = (m.innings || []).reduce((acc, i) => (acc[i.team] = `${i.runs}/${i.wickets} (${i.overs})`, acc), {});
+  // Show the competition name (e.g. "ICC Women's T20 World Cup") when present,
+  // with the format + round as context.
+  const comp = m.league || m.type || "Cricket";
+  const sub = [m.league ? m.type : "", m.round].filter(Boolean).join(" · ");
   const c = card();
   c.innerHTML = `
-    <div class="comp"><span>🏏 ${esc(m.type || "Cricket")} · ${esc(m.round || "")}</span>${live ? '<span class="live-badge">LIVE</span>' : `<span>${esc(m.status)}</span>`}</div>
+    <div class="comp"><span>🏏 ${esc(comp)}${sub ? " · " + esc(sub) : ""}</span>${live ? '<span class="live-badge">LIVE</span>' : `<span>${esc(m.status)}</span>`}</div>
     ${m.startingAt ? `<div class="when">📅 ${esc(fmtDateTime(m.startingAt))}</div>` : ""}
     <div class="teams">
       ${teamRow(m.localTeam, inns[m.localTeam])}

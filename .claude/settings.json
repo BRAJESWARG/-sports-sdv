@@ -45,7 +45,8 @@
       "Bash(grep -vE '^\\\\s*#|^\\\\s*$' .env.example)",
       "Bash(git commit *)",
       "Bash(env)",
-      "Bash(git commit -m 'Add competition/tournament filtering + cricket league names' -m '- Include league name on cricket matches \\(SportMonks include=league\\) and expose it on MatchDTO *)"
+      "Bash(git commit -m 'Add competition/tournament filtering + cricket league names' -m '- Include league name on cricket matches \\(SportMonks include=league\\) and expose it on MatchDTO *)",
+      "Bash(git commit -m 'Show competition/league name on cricket cards' -m 'Cricket cards now display the league \\(e.g. '\\\\''ICC Women'\\\\''s T20 World Cup'\\\\''\\) with the *)"
     ]
   }
 }
