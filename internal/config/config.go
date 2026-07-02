@@ -39,7 +39,7 @@ func Load() (*Config, error) {
 		SportmonksBaseURL:            getenv("SPORTMONKS_BASE_URL", "https://cricket.sportmonks.com/api/v2.0"),
 		SportmonksInsecureSkipVerify: getbool("SPORTMONKS_INSECURE_SKIP_VERIFY", false),
 		FootballToken:                firstNonEmpty(os.Getenv("FOOTBALL_API_TOKEN"), os.Getenv("SPORTMONKS_FOOTBALL_TOKEN")),
-		FootballBaseURL:              getenv("FOOTBALL_BASE_URL", "https://api.football-data.org/v4"),
+		FootballBaseURL:              getenv("FOOTBALL_BASE_URL", "https://v3.football.api-sports.io"),
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
 		CacheTTLLive:                 getdur("CACHE_TTL_LIVE", 20*time.Second),

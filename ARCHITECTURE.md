@@ -1,7 +1,7 @@
 # sports-sdv — Architecture
 
 A Go backend that wraps external sports-data providers (SportMonks **Cricket v2**
-and **football-data.org v4**), normalizes their responses into its own DTOs, caches them,
+and **API-Football / api-sports.io v3**), normalizes their responses into its own DTOs, caches them,
 and re-exposes a clean REST API — plus an embedded, dependency-free **chatbot
 web UI** for querying live scores, fixtures, tables and rankings.
 
@@ -63,9 +63,9 @@ internal/sportmonks/            Provider client: SportMonks Cricket API v2.0
   client.go                       HTTP, auth (api_token query param), envelope, retry, error sanitizing
   types.go                        Upstream response types (Fixture, Run, Batting, Bowling, Standing, RankingType, ...)
 
-internal/football/              Provider client: football-data.org API v4
-  client.go                       HTTP, auth (X-Auth-Token header), per-endpoint decoding, retry
-  types.go                        Upstream v4 types (Match, Competition, StandingsResponse, ...)
+internal/football/              Provider client: API-Football (api-sports.io) v3
+  client.go                       HTTP, auth (x-apisports-key header), get/response envelope, retry
+  types.go                        Upstream v3 types (Fixture, League, StandingsResponse, ...)
 
 internal/sports/                Business layer: orchestration + mapping to public DTOs
   service.go                      Cricket service; cache-aside; live-scorecard computation
@@ -161,19 +161,21 @@ resources return `{"data": {...}}`; errors return `{"error": "..."}`.
 - **Rankings stats are nested** under a `ranking` object per team; the filter is
   `filter[type]` (not `tournament_type`, despite older docs).
 
-### football-data.org API v4 (`internal/football`)
-- **Base URL:** `https://api.football-data.org/v4`
-- **Auth:** `X-Auth-Token` header — requires a **free** token (register at football-data.org)
-- **Endpoints:** `/matches?status=LIVE`, `/matches?dateFrom=&dateTo=` (dateTo is
-  **exclusive** → client passes `nextDay(to)`), `/matches/{id}`,
-  `/competitions/{code}/standings`, `/competitions`
-- **No envelope wrapper** — each endpoint returns its own object
-  (`{matches:[]}`, `{competitions:[]}`, standings object with explicit
-  `playedGames/won/draw/lost/points/goalsFor/...` fields — no `type_id` mapping needed).
-- **Standings are by competition code** (e.g. `PL`, `PD`, `BL1`), not a season id.
-- Free tier: ~10 req/min and a limited set of competitions.
-- *(Previously SportMonks Football v3 — swapped out because the cricket key
-  didn't cover football and SDV needs real-time/commercial-grade data; see §11.)*
+### API-Football (api-sports.io) v3 (`internal/football`)
+- **Base URL:** `https://v3.football.api-sports.io`
+- **Auth:** `x-apisports-key` header
+- **Envelope:** `{get, parameters, errors, results, response}` — errors can arrive
+  with HTTP 200, so the client inspects `errors` and surfaces them.
+- **Endpoints:** `/fixtures?live=all`, `/fixtures?date=`, `/fixtures?league=&season=(&from=&to=)`,
+  `/fixtures?id=`, `/standings?league=&season=`, `/leagues`.
+- **Competition scoping is by league id + season.** The UI's competition codes
+  (WC, PL, …) are mapped to API-Football league ids in `service_football.go`
+  (`fbLeagueID`); season defaults to the current year.
+- **Free-plan limitation:** the free plan only serves league/season data for
+  seasons **2022–2024** — current-season standings and the **2026 World Cup are
+  blocked** (`plan: Free plans do not have access to this season`). `live=all`
+  and `date=` (today's fixtures) still work. For 2025+ league/season data a paid
+  plan is required. *(football-data.org's free tier did include WC 2026 — see §11.)*
 
 ---
 
@@ -219,8 +221,8 @@ A single-page app that turns free-text into API calls and renders **score cards*
 | `SPORTMONKS_API_TOKEN` / `API_CRICKET_KEY` | — | **Required.** Cricket token |
 | `SPORTMONKS_BASE_URL` | `https://cricket.sportmonks.com/api/v2.0` | |
 | `SPORTMONKS_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
-| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | football-data.org token (free; endpoints error without it) |
-| `FOOTBALL_BASE_URL` | `https://api.football-data.org/v4` | |
+| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | API-Football key (`x-apisports-key`); endpoints error without it |
+| `FOOTBALL_BASE_URL` | `https://v3.football.api-sports.io` | |
 | `FOOTBALL_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
 | `CACHE_TTL` | `5m` | Static data (standings, leagues, schedule) |
 | `CACHE_TTL_LIVE` | `20s` | Volatile data (livescores, today, scorecards) |
@@ -249,9 +251,10 @@ A single-page app that turns free-text into API calls and renders **score cards*
 
 - **Cricket is polling-based** (no native push) — the UI re-queries; there is no
   server→browser live streaming yet.
-- **Football needs a (free) football-data.org token**; without it the provider
-  restricts most resources. Free tier is rate-limited (~10 req/min) and covers a
-  limited set of competitions.
+- **Football uses API-Football (api-sports.io)** and needs an `x-apisports-key`.
+  Its **free plan only serves seasons 2022–2024** for league/season queries, so
+  current standings and the **2026 World Cup are blocked** on free (paid plan
+  required); `live=all` and today's `date=` fixtures still work.
 - **Whole-day historical queries can be slow** upstream (mitigated by the 30s
   timeout + a clean "timed out — try again" message).
 - **Standings season ids** are hardcoded defaults in the UI (`SEASON`) — should
@@ -307,11 +310,16 @@ A single-page app that turns free-text into API calls and renders **score cards*
     and added tournament recognition (World Cup, IPL, …) so "world cup match"
     returns only World Cup fixtures (or says none are running) instead of a
     generic list; also handle possessive dates ("todays", "yesterdays").
+13. **Football provider swap #2** — moved football from football-data.org to
+    **API-Football (api-sports.io) v3** at the user's request. Live scores and
+    today's fixtures work; note the free plan blocks seasons 2025+ (so WC 2026 /
+    current standings need a paid plan — football-data.org's free tier had WC 2026).
 
 ### Git history
 ```
-(pending)  Add competition/tournament filtering + cricket league names
-(pending)  Swap football provider to football-data.org (v4)
+(pending)  Switch football provider to API-Football (api-sports.io v3)
+4b3bf05    Add competition/tournament filtering + cricket league names
+a054bad    Swap football provider to football-data.org (v4)
 f4333fd    Fix live badge on ended matches; tolerate per-sport fetch errors
 dd5f0a2    Add live scorecard detail, relative-date queries, and response timing
 6a331ec    Remove mock/offline mode: live-only SportMonks API

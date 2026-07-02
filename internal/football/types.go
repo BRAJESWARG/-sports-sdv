@@ -1,95 +1,93 @@
 package football
 
-// Types for the football-data.org v4 API.
-// Docs: https://docs.football-data.org/general/v4/
+// Types for the API-Football (api-sports.io) v3 API.
+// Docs: https://www.api-football.com/documentation-v3
 
-// Match is a football-data.org match.
-type Match struct {
-	ID          int64       `json:"id"`
-	UtcDate     string      `json:"utcDate"`
-	Status      string      `json:"status"` // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, POSTPONED, ...
-	Matchday    int         `json:"matchday"`
-	Minute      *int        `json:"minute"`
-	Competition Competition `json:"competition"`
-	Season      Season      `json:"season"`
-	HomeTeam    TeamRef     `json:"homeTeam"`
-	AwayTeam    TeamRef     `json:"awayTeam"`
-	Score       Score       `json:"score"`
+// Fixture is one entry in the /fixtures `response` array.
+type Fixture struct {
+	Fixture FixtureInfo `json:"fixture"`
+	League  LeagueInfo  `json:"league"`
+	Teams   struct {
+		Home Team `json:"home"`
+		Away Team `json:"away"`
+	} `json:"teams"`
+	Goals struct {
+		Home *int `json:"home"`
+		Away *int `json:"away"`
+	} `json:"goals"`
 }
 
-// Competition is a league/cup.
-type Competition struct {
-	ID     int64  `json:"id"`
+// FixtureInfo holds the core fixture fields.
+type FixtureInfo struct {
+	ID     int    `json:"id"`
+	Date   string `json:"date"` // ISO8601 with offset, e.g. 2026-07-02T19:00:00+00:00
+	Status struct {
+		Long    string `json:"long"`  // "Match Finished", "Second Half", ...
+		Short   string `json:"short"` // NS, 1H, HT, 2H, FT, ...
+		Elapsed *int   `json:"elapsed"`
+	} `json:"status"`
+	Venue struct {
+		Name string `json:"name"`
+		City string `json:"city"`
+	} `json:"venue"`
+}
+
+// LeagueInfo is the league block on a fixture.
+type LeagueInfo struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Country string `json:"country"`
+	Season  int    `json:"season"`
+	Round   string `json:"round"`
+}
+
+// Team is a team reference.
+type Team struct {
+	ID     int    `json:"id"`
 	Name   string `json:"name"`
-	Code   string `json:"code"` // e.g. "PL", "PD", "BL1"
-	Emblem string `json:"emblem"`
+	Logo   string `json:"logo"`
+	Winner *bool  `json:"winner"`
 }
 
-// Season describes the season a match/standing belongs to.
-type Season struct {
-	ID              int64  `json:"id"`
-	StartDate       string `json:"startDate"`
-	EndDate         string `json:"endDate"`
-	CurrentMatchday int    `json:"currentMatchday"`
+// League is one entry in the /leagues `response` array.
+type League struct {
+	League struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+		Logo string `json:"logo"`
+	} `json:"league"`
+	Country struct {
+		Name string `json:"name"`
+		Code string `json:"code"`
+	} `json:"country"`
 }
 
-// TeamRef is the trimmed team object used across matches/standings.
-type TeamRef struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	ShortName string `json:"shortName"`
-	Tla       string `json:"tla"`
-	Crest     string `json:"crest"`
-}
-
-// Score holds the match scoreline.
-type Score struct {
-	Winner   string     `json:"winner"` // HOME_TEAM, AWAY_TEAM, DRAW, or null
-	Duration string     `json:"duration"`
-	FullTime ScoreGoals `json:"fullTime"` // current running score during play; final at end
-	HalfTime ScoreGoals `json:"halfTime"`
-}
-
-// ScoreGoals is a home/away goal pair (nil until the match starts).
-type ScoreGoals struct {
-	Home *int `json:"home"`
-	Away *int `json:"away"`
-}
-
-// ---- response envelopes ----
-
-type matchesEnvelope struct {
-	Matches []Match `json:"matches"`
-}
-
-type competitionsEnvelope struct {
-	Competitions []Competition `json:"competitions"`
-}
-
-// StandingsResponse is the /competitions/{code}/standings payload.
+// StandingsResponse is one entry in the /standings `response` array.
 type StandingsResponse struct {
-	Competition Competition      `json:"competition"`
-	Season      Season           `json:"season"`
-	Standings   []StandingsGroup `json:"standings"`
-}
-
-// StandingsGroup is one standings table (TOTAL / HOME / AWAY).
-type StandingsGroup struct {
-	Stage string        `json:"stage"`
-	Type  string        `json:"type"`
-	Table []StandingRow `json:"table"`
+	League struct {
+		ID        int             `json:"id"`
+		Name      string          `json:"name"`
+		Season    int             `json:"season"`
+		Standings [][]StandingRow `json:"standings"` // groups -> rows
+	} `json:"league"`
 }
 
 // StandingRow is one team's row in a standings table.
 type StandingRow struct {
-	Position       int     `json:"position"`
-	Team           TeamRef `json:"team"`
-	PlayedGames    int     `json:"playedGames"`
-	Won            int     `json:"won"`
-	Draw           int     `json:"draw"`
-	Lost           int     `json:"lost"`
-	Points         int     `json:"points"`
-	GoalsFor       int     `json:"goalsFor"`
-	GoalsAgainst   int     `json:"goalsAgainst"`
-	GoalDifference int     `json:"goalDifference"`
+	Rank      int    `json:"rank"`
+	Team      Team   `json:"team"`
+	Points    int    `json:"points"`
+	GoalsDiff int    `json:"goalsDiff"`
+	Form      string `json:"form"`
+	All       struct {
+		Played int `json:"played"`
+		Win    int `json:"win"`
+		Draw   int `json:"draw"`
+		Lose   int `json:"lose"`
+		Goals  struct {
+			For     int `json:"for"`
+			Against int `json:"against"`
+		} `json:"goals"`
+	} `json:"all"`
 }
