@@ -98,6 +98,21 @@ function detectTeam(q) {
   return [...TEAMS_FOOTBALL, ...TEAMS_CRICKET].find((t) => q.includes(t)) || null;
 }
 
+// Named competitions/tournaments. `re` matches both the query and the upstream
+// league name, so we can filter matches to a tournament (and say when none run).
+const COMPETITIONS = [
+  { label: "World Cup", re: /world ?cup/ },
+  { label: "Champions Trophy", re: /champions trophy/ },
+  { label: "IPL", re: /\bipl\b|indian premier/ },
+  { label: "The Hundred", re: /the hundred|\bhundred\b/ },
+  { label: "Big Bash", re: /big ?bash|\bbbl\b/ },
+  { label: "Ashes", re: /\bashes\b/ },
+  { label: "Champions League", re: /champions league|\bucl\b/ },
+];
+function detectCompetition(q) {
+  return COMPETITIONS.find((c) => c.re.test(q)) || null;
+}
+
 // Map free-text cricket format to a ranking type (TEST / ODI / T20I).
 // Understands synonyms: "oneday", "one day", "50 over" -> ODI; "twenty20" -> T20I.
 function rankingType(q) {
@@ -143,9 +158,9 @@ function fmtDateTime(s) {
 // Parse a relative date range from the query, or null for the default window.
 function parseDateWindow(q) {
   const day = (o) => isoDate(o);
-  if (/\byesterday\b/.test(q)) return { from: day(-1), to: day(-1), label: "Yesterday" };
-  if (/\btomorrow\b/.test(q)) return { from: day(1), to: day(1), label: "Tomorrow" };
-  if (/\btoday\b/.test(q)) return { from: day(0), to: day(0), label: "Today" };
+  if (/\byesterday'?s?\b/.test(q)) return { from: day(-1), to: day(-1), label: "Yesterday" };
+  if (/\btomorrow'?s?\b/.test(q)) return { from: day(1), to: day(1), label: "Tomorrow" };
+  if (/\btoday'?s?\b/.test(q)) return { from: day(0), to: day(0), label: "Today" };
   if (/last week|past week|last 7 days|last seven days/.test(q)) return { from: day(-7), to: day(0), label: "Last 7 days" };
   if (/next week/.test(q)) return { from: day(7), to: day(14), label: "Next week" };
   if (/this week/.test(q)) return { from: day(0), to: day(7), label: "This week" };
@@ -165,18 +180,19 @@ async function route(query) {
   const format = detectFormat(q);
   const effSport = format ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
+  const comp = detectCompetition(q); // e.g. "world cup", "ipl"
 
   let action = "live";
   if (window) action = "matches"; // a dated query is about fixtures/results
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
   else if (/(live|score|now|playing)/.test(q)) action = "live";
-  else if (team || format) action = "matches"; // bare team/format -> show fixtures
-  return handleMatches(effSport, action, team, format, window);
+  else if (team || format || comp) action = "matches";
+  return handleMatches(effSport, action, team, format, window, comp);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, team, format, window) {
+async function handleMatches(sport, action, team, format, window, comp) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
@@ -208,6 +224,11 @@ async function handleMatches(sport, action, team, format, window) {
     cricket = cricket.filter((m) => hit(m.localTeam, team) || hit(m.visitorTeam, team));
     football = football.filter((m) => hit(m.homeTeam, team) || hit(m.awayTeam, team));
   }
+  // Filter to a named tournament by matching the upstream league name.
+  if (comp) {
+    cricket = cricket.filter((m) => comp.re.test((m.league || "").toLowerCase()));
+    football = football.filter((m) => comp.re.test((m.league || "").toLowerCase()));
+  }
 
   const total = cricket.length + football.length;
   const fmt = format ? `${format} ` : "";
@@ -217,7 +238,11 @@ async function handleMatches(sport, action, team, format, window) {
     // for an ambiguous query, ignore football's "no token" and just say none found.
     const relevantErr = sport === "football" ? footballErr : cricketErr;
     if (relevantErr) { addBotText("⚠️ upstream error: " + esc(relevantErr), "err"); return; }
-    addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${cap(team)}”` : ""}${when}. Try “live football” or a team name.`, "err");
+    if (comp) {
+      addBotText(`No <b>${esc(comp.label)}</b> matches found${team ? ` for “${esc(cap(team))}”` : ""}${when} — it may not be running right now.`, "err");
+      return;
+    }
+    addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${esc(cap(team))}”` : ""}${when}. Try “live football” or a team name.`, "err");
     return;
   }
 
@@ -226,7 +251,8 @@ async function handleMatches(sport, action, team, format, window) {
   cricket.forEach((m) => grid.appendChild(cricketCard(m)));
   football.forEach((m) => grid.appendChild(footballCard(m)));
   const label = live ? "Live now" : window ? `${fmt}${window.label}` : `${fmt}Fixtures & results`;
-  addBotNode(`${label} — ${total} match${total > 1 ? "es" : ""}${team ? ` · ${cap(team)}` : ""}`, grid);
+  const suffix = (team ? ` · ${cap(team)}` : "") + (comp ? ` · ${comp.label}` : "");
+  addBotNode(`${label} — ${total} match${total > 1 ? "es" : ""}${suffix}`, grid);
   wireTilt(grid);
 }
 

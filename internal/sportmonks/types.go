@@ -71,6 +71,7 @@ type Fixture struct {
 	WinnerTeamID  *int   `json:"winner_team_id"`
 
 	// includes
+	League      *Data[League]    `json:"league,omitempty"`
 	LocalTeam   *Data[Team]      `json:"localteam,omitempty"`
 	VisitorTeam *Data[Team]      `json:"visitorteam,omitempty"`
 	Runs        *Data[[]Run]     `json:"runs,omitempty"`

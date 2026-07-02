@@ -44,7 +44,8 @@
       "Bash(git commit -m 'Fix live badge on ended matches; tolerate per-sport fetch errors' -m '- Gate the live flag + scorecard enrichment on an actual in-play status *)",
       "Bash(grep -vE '^\\\\s*#|^\\\\s*$' .env.example)",
       "Bash(git commit *)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(git commit -m 'Add competition/tournament filtering + cricket league names' -m '- Include league name on cricket matches \\(SportMonks include=league\\) and expose it on MatchDTO *)"
     ]
   }
 }

@@ -198,8 +198,10 @@ For an in-progress cricket match the service computes, from `runs` + `batting` +
 A single-page app that turns free-text into API calls and renders **score cards**.
 - **Intent routing** (`app.js`): detects sport (team/keyword lists), action
   (live / matches / standings / rankings), cricket **format** (test/oneday/t20,
-  incl. synonyms like "oneday", "50 over"), and **relative dates** ("yesterday",
-  "today", "last week", "results").
+  incl. synonyms like "oneday", "50 over"), **relative dates** ("yesterday",
+  "today", "last week", "results"), and **named competitions** (World Cup, IPL,
+  The Hundred, Big Bash, …) — matched against the match's league name so a
+  tournament query returns only that tournament (or an honest "not running now").
 - **Resilience:** cricket and football are fetched independently, so a football
   failure (e.g. no token) doesn't kill a cricket/ambiguous query.
 - **Response time:** each answer shows its round-trip time (`⚡ responded in N ms`).
@@ -301,8 +303,14 @@ A single-page app that turns free-text into API calls and renders **score cards*
     needs only a free token. DTOs/endpoints/UI stayed put — a one-package rewrite
     plus a standings change (season id → competition code).
 
+12. **Competition filtering** — exposed the cricket **league name** on matches
+    and added tournament recognition (World Cup, IPL, …) so "world cup match"
+    returns only World Cup fixtures (or says none are running) instead of a
+    generic list; also handle possessive dates ("todays", "yesterdays").
+
 ### Git history
 ```
+(pending)  Add competition/tournament filtering + cricket league names
 (pending)  Swap football provider to football-data.org (v4)
 f4333fd    Fix live badge on ended matches; tolerate per-sport fetch errors
 dd5f0a2    Add live scorecard detail, relative-date queries, and response timing

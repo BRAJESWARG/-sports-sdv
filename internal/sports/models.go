@@ -22,7 +22,8 @@ type MatchDTO struct {
 	LeagueID    int          `json:"leagueId"`
 	SeasonID    int          `json:"seasonId"`
 	Round       string       `json:"round,omitempty"`
-	Note        string       `json:"note,omitempty"` // result summary when finished
+	League      string       `json:"league,omitempty"` // competition name (for tournament filtering)
+	Note        string       `json:"note,omitempty"`   // result summary when finished
 	LocalTeam   string       `json:"localTeam"`
 	VisitorTeam string       `json:"visitorTeam"`
 	Innings     []InningsDTO `json:"innings,omitempty"`

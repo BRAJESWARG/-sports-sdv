@@ -61,6 +61,13 @@ func teamName(d *sportmonks.Data[sportmonks.Team]) string {
 	return d.Data.Name
 }
 
+func leagueName(d *sportmonks.Data[sportmonks.League]) string {
+	if d == nil {
+		return ""
+	}
+	return d.Data.Name
+}
+
 // matchFromFixture maps an upstream fixture to a MatchDTO, resolving team names
 // and innings totals from the localteam/visitorteam/runs includes.
 func matchFromFixture(f sportmonks.Fixture) MatchDTO {
@@ -75,6 +82,7 @@ func matchFromFixture(f sportmonks.Fixture) MatchDTO {
 		LeagueID:    f.LeagueID,
 		SeasonID:    f.SeasonID,
 		Round:       f.Round,
+		League:      leagueName(f.League),
 		Note:        f.Note,
 		LocalTeam:   teamName(f.LocalTeam),
 		VisitorTeam: teamName(f.VisitorTeam),

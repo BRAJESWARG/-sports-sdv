@@ -191,7 +191,7 @@ func withIncludes(q url.Values, includes ...string) url.Values {
 // enough detail (batting/bowling) to build a live scorecard.
 func (c *Client) Livescores(ctx context.Context, q url.Values) ([]Fixture, error) {
 	raw, err := c.get(ctx, "/livescores", withIncludes(q,
-		"localteam", "visitorteam", "runs", "batting.batsman", "bowling.bowler"))
+		"league", "localteam", "visitorteam", "runs", "batting.batsman", "bowling.bowler"))
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (c *Client) Livescores(ctx context.Context, q url.Values) ([]Fixture, error
 
 // Fixtures returns matches matching the query (filters like filter[starts_between]).
 func (c *Client) Fixtures(ctx context.Context, q url.Values) ([]Fixture, error) {
-	raw, err := c.get(ctx, "/fixtures", withIncludes(q, "localteam", "visitorteam", "runs"))
+	raw, err := c.get(ctx, "/fixtures", withIncludes(q, "league", "localteam", "visitorteam", "runs"))
 	if err != nil {
 		return nil, err
 	}
