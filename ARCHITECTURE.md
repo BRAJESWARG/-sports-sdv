@@ -176,6 +176,11 @@ resources return `{"data": {...}}`; errors return `{"error": "..."}`.
   blocked** (`plan: Free plans do not have access to this season`). `live=all`
   and `date=` (today's fixtures) still work. For 2025+ league/season data a paid
   plan is required. *(football-data.org's free tier did include WC 2026 — see §11.)*
+- **Switchable provider:** `FOOTBALL_PROVIDER` selects the implementation at
+  startup — `apifootball` (default) or `footballdata` (the football-data.org
+  client, kept in `internal/footballdata` as a fallback). Both satisfy the
+  `sports.FootballAPI` interface, so the HTTP layer is provider-agnostic. Setting
+  `footballdata` also defaults the base URL to `https://api.football-data.org/v4`.
 
 ---
 
@@ -221,8 +226,9 @@ A single-page app that turns free-text into API calls and renders **score cards*
 | `SPORTMONKS_API_TOKEN` / `API_CRICKET_KEY` | — | **Required.** Cricket token |
 | `SPORTMONKS_BASE_URL` | `https://cricket.sportmonks.com/api/v2.0` | |
 | `SPORTMONKS_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
-| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | API-Football key (`x-apisports-key`); endpoints error without it |
-| `FOOTBALL_BASE_URL` | `https://v3.football.api-sports.io` | |
+| `FOOTBALL_PROVIDER` | `apifootball` | `apifootball` or `footballdata` |
+| `FOOTBALL_API_TOKEN` / `SPORTMONKS_FOOTBALL_TOKEN` | — | Football key; endpoints error without it |
+| `FOOTBALL_BASE_URL` | per provider | api-sports.io v3, or api.football-data.org/v4 |
 | `FOOTBALL_INSECURE_SKIP_VERIFY` | `false` | Dev-only TLS bypass |
 | `CACHE_TTL` | `5m` | Static data (standings, leagues, schedule) |
 | `CACHE_TTL_LIVE` | `20s` | Volatile data (livescores, today, scorecards) |
@@ -314,10 +320,15 @@ A single-page app that turns free-text into API calls and renders **score cards*
     **API-Football (api-sports.io) v3** at the user's request. Live scores and
     today's fixtures work; note the free plan blocks seasons 2025+ (so WC 2026 /
     current standings need a paid plan — football-data.org's free tier had WC 2026).
+14. **Switchable football provider** — kept football-data.org as a fallback
+    (`internal/footballdata`) behind a `sports.FootballAPI` interface; select with
+    `FOOTBALL_PROVIDER`. API-Football is the default; football-data.org is one env
+    var away (its free tier still serves WC 2026).
 
 ### Git history
 ```
-(pending)  Switch football provider to API-Football (api-sports.io v3)
+(pending)  Make football provider switchable (keep football-data.org as fallback)
+83e1edc    Switch football provider to API-Football (api-sports.io v3)
 4b3bf05    Add competition/tournament filtering + cricket league names
 a054bad    Swap football provider to football-data.org (v4)
 f4333fd    Fix live badge on ended matches; tolerate per-sport fetch errors

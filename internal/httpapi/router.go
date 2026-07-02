@@ -11,7 +11,7 @@ import (
 
 // NewRouter builds the http.Handler for the service. It uses the stdlib
 // ServeMux method+pattern routing added in Go 1.22.
-func NewRouter(cricket *sports.Service, football *sports.FootballService, log *slog.Logger) http.Handler {
+func NewRouter(cricket *sports.Service, football sports.FootballAPI, log *slog.Logger) http.Handler {
 	h := &Handlers{svc: cricket}
 	fb := &FootballHandlers{svc: football}
 

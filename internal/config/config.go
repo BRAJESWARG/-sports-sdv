@@ -18,7 +18,8 @@ type Config struct {
 	// Dev-only escape hatch for broken CA stores / intercepting proxies.
 	SportmonksInsecureSkipVerify bool
 
-	// --- SportMonks Football (v3) ---
+	// --- Football ---
+	FootballProvider           string // "apifootball" (default) | "footballdata"
 	FootballToken              string
 	FootballBaseURL            string
 	FootballInsecureSkipVerify bool
@@ -38,12 +39,22 @@ func Load() (*Config, error) {
 		SportmonksToken:              firstNonEmpty(os.Getenv("SPORTMONKS_API_TOKEN"), os.Getenv("API_CRICKET_KEY")),
 		SportmonksBaseURL:            getenv("SPORTMONKS_BASE_URL", "https://cricket.sportmonks.com/api/v2.0"),
 		SportmonksInsecureSkipVerify: getbool("SPORTMONKS_INSECURE_SKIP_VERIFY", false),
+		FootballProvider:             getenv("FOOTBALL_PROVIDER", "apifootball"),
 		FootballToken:                firstNonEmpty(os.Getenv("FOOTBALL_API_TOKEN"), os.Getenv("SPORTMONKS_FOOTBALL_TOKEN")),
-		FootballBaseURL:              getenv("FOOTBALL_BASE_URL", "https://v3.football.api-sports.io"),
+		FootballBaseURL:              os.Getenv("FOOTBALL_BASE_URL"), // provider-default applied below
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
 		CacheTTLLive:                 getdur("CACHE_TTL_LIVE", 20*time.Second),
 		UpstreamTimeout:              getdur("UPSTREAM_TIMEOUT", 30*time.Second),
+	}
+
+	// Default the football base URL to match the selected provider.
+	if cfg.FootballBaseURL == "" {
+		if cfg.FootballProvider == "footballdata" {
+			cfg.FootballBaseURL = "https://api.football-data.org/v4"
+		} else {
+			cfg.FootballBaseURL = "https://v3.football.api-sports.io"
+		}
 	}
 
 	if cfg.SportmonksToken == "" {

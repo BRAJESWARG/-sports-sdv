@@ -48,7 +48,8 @@
       "Bash(git commit -m 'Add competition/tournament filtering + cricket league names' -m '- Include league name on cricket matches \\(SportMonks include=league\\) and expose it on MatchDTO *)",
       "Bash(git commit -m 'Show competition/league name on cricket cards' -m 'Cricket cards now display the league \\(e.g. '\\\\''ICC Women'\\\\''s T20 World Cup'\\\\''\\) with the *)",
       "Bash(gofmt -w internal/)",
-      "Bash(git commit -m 'Switch football provider to API-Football \\(api-sports.io v3\\)' -m '- Rewrite football client/types for API-Football v3 \\(x-apisports-key header, *)"
+      "Bash(git commit -m 'Switch football provider to API-Football \\(api-sports.io v3\\)' -m '- Rewrite football client/types for API-Football v3 \\(x-apisports-key header, *)",
+      "Bash(git commit -m 'Make football provider switchable; keep football-data.org as fallback' -m '- Restore football-data.org client as internal/footballdata \\(dormant\\) + FootballDataService *)"
     ]
   }
 }

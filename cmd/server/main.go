@@ -17,6 +17,7 @@ import (
 	"github.com/bgmaster/sports-sdv/internal/cache"
 	"github.com/bgmaster/sports-sdv/internal/config"
 	"github.com/bgmaster/sports-sdv/internal/football"
+	"github.com/bgmaster/sports-sdv/internal/footballdata"
 	"github.com/bgmaster/sports-sdv/internal/httpapi"
 	"github.com/bgmaster/sports-sdv/internal/sportmonks"
 	"github.com/bgmaster/sports-sdv/internal/sports"
@@ -32,7 +33,6 @@ func main() {
 	}
 
 	client := sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
-	fbClient := football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
 	if cfg.SportmonksInsecureSkipVerify || cfg.FootballInsecureSkipVerify {
 		log.Warn("INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
 	}
@@ -44,7 +44,19 @@ func main() {
 	defer mem.Close()
 
 	svc := sports.New(client, mem, cfg.CacheTTL, cfg.CacheTTLLive)
-	fbSvc := sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+
+	// Football provider is selectable (FOOTBALL_PROVIDER); default = API-Football.
+	var fbSvc sports.FootballAPI
+	switch cfg.FootballProvider {
+	case "footballdata":
+		fdClient := footballdata.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
+		fbSvc = sports.NewFootballData(fdClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+		log.Info("football provider", "provider", "football-data.org", "baseURL", cfg.FootballBaseURL)
+	default:
+		fbClient := football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
+		fbSvc = sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+		log.Info("football provider", "provider", "API-Football", "baseURL", cfg.FootballBaseURL)
+	}
 	router := httpapi.NewRouter(svc, fbSvc, log)
 
 	srv := &http.Server{

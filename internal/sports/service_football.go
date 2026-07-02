@@ -13,6 +13,17 @@ import (
 	"github.com/bgmaster/sports-sdv/internal/football"
 )
 
+// FootballAPI is the football operation set the HTTP layer depends on. It's
+// implemented by both provider-backed services (API-Football and
+// football-data.org), so the provider can be swapped via config.
+type FootballAPI interface {
+	Livescores(ctx context.Context) ([]FootballMatchDTO, error)
+	Matches(ctx context.Context, q url.Values) ([]FootballMatchDTO, error)
+	Match(ctx context.Context, id int64) (*FootballMatchDTO, error)
+	Standings(ctx context.Context, competition string) ([]FootballStandingDTO, error)
+	Leagues(ctx context.Context, q url.Values) ([]FootballLeagueDTO, error)
+}
+
 // FootballService orchestrates the API-Football client + cache and maps upstream
 // types to football DTOs.
 type FootballService struct {

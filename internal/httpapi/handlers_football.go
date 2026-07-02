@@ -11,7 +11,7 @@ import (
 
 // FootballHandlers serves the /api/v1/football/* routes.
 type FootballHandlers struct {
-	svc *sports.FootballService
+	svc sports.FootballAPI
 }
 
 // GET /api/v1/football/livescores
