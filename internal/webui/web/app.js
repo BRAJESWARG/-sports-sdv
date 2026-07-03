@@ -172,7 +172,7 @@ function parseDateWindow(q) {
   if (/last week|past week|last 7 days|last seven days/.test(q)) return { from: day(-7), to: day(0), label: "Last 7 days" };
   if (/next week/.test(q)) return { from: day(7), to: day(14), label: "Next week" };
   if (/this week/.test(q)) return { from: day(0), to: day(7), label: "This week" };
-  if (/\b(results?|recent|past)\b/.test(q)) return { from: day(-7), to: day(0), label: "Recent results" };
+  if (/\b(results?|recent|past|last|latest)\b/.test(q)) return { from: day(-7), to: day(0), label: "Recent results" };
   return null;
 }
 
