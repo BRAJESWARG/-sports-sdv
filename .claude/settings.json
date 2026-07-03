@@ -56,7 +56,9 @@
       "Bash(grep -E '^\\(\\\\.env$|logs/\\)')",
       "Bash(git commit -m 'Write logs to a file \\(LOG_FILE, default logs/server.log\\)' -m '- Logger writes JSON to stdout AND appends to LOG_FILE \\(default logs/server.log\\) *)",
       "Bash(git commit -m 'Log request & response bodies \\(upstream received + client sent\\)' -m '- upstream log now includes the response body received from the provider \\(truncated\\) *)",
-      "Bash(git commit -m 'Redact api_token from logged transport errors \\(secret leak fix\\)' -m 'Go'\\\\''s http.Client transport errors embed the full request URL, which for *)"
+      "Bash(git commit -m 'Redact api_token from logged transport errors \\(secret leak fix\\)' -m 'Go'\\\\''s http.Client transport errors embed the full request URL, which for *)",
+      "Bash(gofmt -w internal/football/client.go)",
+      "Bash(git commit -m 'Clearer API-Football HTTP error messages \\(404/401/429/5xx\\)' -m 'A bare HTTP 404 \\({\"error\":404}\\) from api-sports.io is not its normal envelope *)"
     ]
   }
 }

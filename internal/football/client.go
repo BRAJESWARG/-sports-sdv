@@ -122,7 +122,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 	logUpstream("football:api-football", path, q, resp.StatusCode, time.Since(start), nil, body)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: summarizeBody(body)}
+		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: statusMessage(resp.StatusCode, body)}
 	}
 	if looksLikeHTML(body) {
 		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: proxyHint}
@@ -136,6 +136,24 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (json.RawMe
 		return nil, &APIError{StatusCode: resp.StatusCode, Endpoint: path, Message: msg}
 	}
 	return env.Response, nil
+}
+
+// statusMessage turns a non-2xx HTTP status into a clear message. API-Football
+// normally reports problems with HTTP 200 + an `errors` object, so a real 4xx/5xx
+// usually means an auth/plan/quota issue or an intercepting proxy/gateway.
+func statusMessage(code int, body []byte) string {
+	switch code {
+	case 401, 403:
+		return "API-Football rejected the key (auth or plan restriction) — check your api-sports.io subscription"
+	case 404:
+		return "API-Football returned HTTP 404 — the request isn't available on your plan, or a network proxy/gateway blocked api-sports.io"
+	case 429:
+		return "API-Football rate limit reached (free plan is ~100 requests/day) — try again later"
+	}
+	if code >= 500 {
+		return fmt.Sprintf("API-Football server error (HTTP %d)", code)
+	}
+	return summarizeBody(body)
 }
 
 // errorsMessage extracts a message from the envelope `errors` field, which may
