@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -13,6 +14,8 @@ type Config struct {
 
 	// LogFile is where JSON logs are written (in addition to stdout). Empty = stdout only.
 	LogFile string
+	// LogBodyMax caps how many chars of request/response bodies are logged; 0 = unlimited.
+	LogBodyMax int
 
 	SportmonksToken   string
 	SportmonksBaseURL string
@@ -37,8 +40,9 @@ type Config struct {
 // It returns an error only when a required value is missing.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:    getenv("PORT", "8090"),
-		LogFile: getenv("LOG_FILE", "logs/server.log"),
+		Port:       getenv("PORT", "8090"),
+		LogFile:    getenv("LOG_FILE", "logs/server.log"),
+		LogBodyMax: getint("LOG_BODY_MAX", 2000),
 		// Accept either SPORTMONKS_API_TOKEN or the API_CRICKET_KEY name.
 		SportmonksToken:              firstNonEmpty(os.Getenv("SPORTMONKS_API_TOKEN"), os.Getenv("API_CRICKET_KEY")),
 		SportmonksBaseURL:            getenv("SPORTMONKS_BASE_URL", "https://cricket.sportmonks.com/api/v2.0"),
@@ -70,6 +74,15 @@ func Load() (*Config, error) {
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getint(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return fallback
 }

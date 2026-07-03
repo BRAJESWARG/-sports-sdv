@@ -46,6 +46,12 @@ func main() {
 	}
 	log := slog.New(slog.NewJSONHandler(logWriter, nil))
 	slog.SetDefault(log) // so provider clients' slog calls share this JSON handler
+
+	// Propagate the log-body cap to the clients + middleware (0 = unlimited).
+	sportmonks.LogBodyMax = cfg.LogBodyMax
+	football.LogBodyMax = cfg.LogBodyMax
+	footballdata.LogBodyMax = cfg.LogBodyMax
+	httpapi.LogBodyMax = cfg.LogBodyMax
 	if cfg.LogFile != "" {
 		log.Info("logging", "file", cfg.LogFile)
 	}

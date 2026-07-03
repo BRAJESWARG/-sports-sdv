@@ -9,7 +9,9 @@ import (
 	"time"
 )
 
-const maxLogBody = 2000
+// LogBodyMax caps how many chars of the client response body are logged
+// (0 = unlimited). Set from config at startup.
+var LogBodyMax = 2000
 
 // statusRecorder captures the response status and (for API calls) a truncated
 // copy of the response body for logging.
@@ -26,12 +28,16 @@ func (r *statusRecorder) WriteHeader(code int) {
 }
 
 func (r *statusRecorder) Write(b []byte) (int, error) {
-	if r.capture && len(r.body) < maxLogBody {
-		n := maxLogBody - len(r.body)
-		if n > len(b) {
-			n = len(b)
+	if r.capture {
+		if LogBodyMax <= 0 {
+			r.body = append(r.body, b...) // unlimited
+		} else if len(r.body) < LogBodyMax {
+			n := LogBodyMax - len(r.body)
+			if n > len(b) {
+				n = len(b)
+			}
+			r.body = append(r.body, b[:n]...)
 		}
-		r.body = append(r.body, b[:n]...)
 	}
 	return r.ResponseWriter.Write(b)
 }
@@ -58,10 +64,10 @@ func logging(log *slog.Logger, next http.Handler) http.Handler {
 }
 
 func truncateBody(b []byte) string {
-	if len(b) < maxLogBody {
+	if LogBodyMax <= 0 || len(b) < LogBodyMax {
 		return string(b)
 	}
-	return string(b) + fmt.Sprintf("…(+more, capped at %d)", maxLogBody)
+	return string(b) + fmt.Sprintf("…(+more, capped at %d)", LogBodyMax)
 }
 
 // recoverer turns panics into 500s instead of crashing the server.

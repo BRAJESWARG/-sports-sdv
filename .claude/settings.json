@@ -59,7 +59,9 @@
       "Bash(git commit -m 'Redact api_token from logged transport errors \\(secret leak fix\\)' -m 'Go'\\\\''s http.Client transport errors embed the full request URL, which for *)",
       "Bash(gofmt -w internal/football/client.go)",
       "Bash(git commit -m 'Clearer API-Football HTTP error messages \\(404/401/429/5xx\\)' -m 'A bare HTTP 404 \\({\"error\":404}\\) from api-sports.io is not its normal envelope *)",
-      "Bash(git commit -m 'Bare team name searches both sports; fetch sports in parallel' -m '- Detect sport only from sport-words \\(football/cricket/fifa/premier/...\\), not team *)"
+      "Bash(git commit -m 'Bare team name searches both sports; fetch sports in parallel' -m '- Detect sport only from sport-words \\(football/cricket/fifa/premier/...\\), not team *)",
+      "Bash(sed -i 's|# LOG_FILE=logs/server.log|# LOG_FILE=logs/server.log\\\\n# Max chars of request/response bodies to log \\(0 = unlimited; default 2000\\).\\\\n# LOG_BODY_MAX=2000|' .env.example)",
+      "Bash(git commit -m 'Make log body size configurable \\(LOG_BODY_MAX; 0 = unlimited\\)' -m 'So you can dump full upstream/client bodies for debugging \\(e.g. confirm a team *)"
     ]
   }
 }

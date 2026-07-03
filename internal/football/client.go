@@ -44,12 +44,14 @@ var secretParamRe = regexp.MustCompile(`(?i)((?:api[_-]?token|api[_-]?key|apikey
 
 func redactSecrets(s string) string { return secretParamRe.ReplaceAllString(s, "${1}***") }
 
+// LogBodyMax caps how many chars of a response body are logged (0 = unlimited).
+var LogBodyMax = 2000
+
 func truncate(b []byte) string {
-	const max = 2000
-	if len(b) <= max {
+	if LogBodyMax <= 0 || len(b) <= LogBodyMax {
 		return string(b)
 	}
-	return string(b[:max]) + fmt.Sprintf("…(+%d bytes)", len(b)-max)
+	return string(b[:LogBodyMax]) + fmt.Sprintf("…(+%d bytes)", len(b)-LogBodyMax)
 }
 
 // Client talks to the API-Football upstream.
