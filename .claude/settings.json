@@ -55,7 +55,8 @@
       "Bash(gofmt -w cmd/ internal/)",
       "Bash(grep -E '^\\(\\\\.env$|logs/\\)')",
       "Bash(git commit -m 'Write logs to a file \\(LOG_FILE, default logs/server.log\\)' -m '- Logger writes JSON to stdout AND appends to LOG_FILE \\(default logs/server.log\\) *)",
-      "Bash(git commit -m 'Log request & response bodies \\(upstream received + client sent\\)' -m '- upstream log now includes the response body received from the provider \\(truncated\\) *)"
+      "Bash(git commit -m 'Log request & response bodies \\(upstream received + client sent\\)' -m '- upstream log now includes the response body received from the provider \\(truncated\\) *)",
+      "Bash(git commit -m 'Redact api_token from logged transport errors \\(secret leak fix\\)' -m 'Go'\\\\''s http.Client transport errors embed the full request URL, which for *)"
     ]
   }
 }

@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -32,12 +33,16 @@ func logUpstream(provider, path string, q url.Values, status int, dur time.Durat
 		req = path + "?" + q.Encode()
 	}
 	if err != nil {
-		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
+		slog.Warn("upstream", "provider", provider, "req", req, "err", redactSecrets(err.Error()), "dur", dur.String())
 		return
 	}
 	slog.Info("upstream", "provider", provider, "req", req, "status", status,
 		"bytes", len(body), "response", truncate(body), "dur", dur.String())
 }
+
+var secretParamRe = regexp.MustCompile(`(?i)((?:api[_-]?token|api[_-]?key|apikey|token|key)=)[^&"'\s]+`)
+
+func redactSecrets(s string) string { return secretParamRe.ReplaceAllString(s, "${1}***") }
 
 func truncate(b []byte) string {
 	const max = 2000

@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -39,12 +40,18 @@ func logUpstream(provider, path string, q url.Values, status int, dur time.Durat
 		req = path + "?" + rq.Encode()
 	}
 	if err != nil {
-		slog.Warn("upstream", "provider", provider, "req", req, "err", err.Error(), "dur", dur.String())
+		slog.Warn("upstream", "provider", provider, "req", req, "err", redactSecrets(err.Error()), "dur", dur.String())
 		return
 	}
 	slog.Info("upstream", "provider", provider, "req", req, "status", status,
 		"bytes", len(body), "response", truncate(body), "dur", dur.String())
 }
+
+// secretParamRe matches key/token query params so their values can be redacted
+// from anything logged (Go's transport errors embed the full request URL).
+var secretParamRe = regexp.MustCompile(`(?i)((?:api[_-]?token|api[_-]?key|apikey|token|key)=)[^&"'\s]+`)
+
+func redactSecrets(s string) string { return secretParamRe.ReplaceAllString(s, "${1}***") }
 
 // truncate renders a body for logging, capping its length.
 func truncate(b []byte) string {
