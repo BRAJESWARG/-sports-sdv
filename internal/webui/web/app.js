@@ -24,9 +24,10 @@ const TEAMS_FOOTBALL = ["arsenal", "chelsea", "liverpool", "manchester", "man ci
 const TEAMS_CRICKET = ["india", "england", "australia", "sweden", "portugal", "south africa",
   "new zealand", "sri lanka", "bangladesh", "pakistan", "west indies", "zimbabwe", "ireland", "afghanistan"];
 
-// Sport-detection keywords = sport words + the team names (NOT used as team filters).
-const KW_FOOTBALL = ["football", "soccer", "goal", "fifa", "premier", "epl", "la liga", "bundesliga", ...TEAMS_FOOTBALL];
-const KW_CRICKET = ["cricket", "t20", "odi", "test", "wicket", "innings", "ipl", ...TEAMS_CRICKET];
+// Sport is detected ONLY from sport-specific words — NOT team names — so a bare
+// team that plays both (e.g. "Portugal") searches BOTH cricket and football.
+const KW_FOOTBALL = ["football", "soccer", "goal", "fifa", "premier", "epl", "la liga", "bundesliga", "ligue", "serie a", "champions league"];
+const KW_CRICKET = ["cricket", "t20", "odi", "test", "wicket", "innings", "ipl", "the hundred", "big bash"];
 
 const $thread = document.getElementById("thread");
 const $form = document.getElementById("composer");
@@ -215,7 +216,8 @@ async function handleMatches(sport, action, team, format, window, comp) {
   // Fetch each sport independently so one failing (e.g. football with no token)
   // doesn't kill the other.
   let cricket = [], football = [], cricketErr = null, footballErr = null;
-  if (wantCricket) {
+  const cricketFetch = (async () => {
+    if (!wantCricket) return;
     try {
       let path = live ? "/api/v1/livescores" : "/api/v1/matches";
       if (!live) {
@@ -226,8 +228,9 @@ async function handleMatches(sport, action, team, format, window, comp) {
       cricket = (await api(path)).data || [];
       if (format) cricket = cricket.filter((m) => matchesFormat(m.type, format));
     } catch (e) { cricketErr = e.message; }
-  }
-  if (wantFootball) {
+  })();
+  const footballFetch = (async () => {
+    if (!wantFootball) return;
     try {
       let fpath = "/api/v1/football/livescores";
       if (!live) {
@@ -240,7 +243,8 @@ async function handleMatches(sport, action, team, format, window, comp) {
       }
       football = (await api(fpath)).data || [];
     } catch (e) { footballErr = e.message; }
-  }
+  })();
+  await Promise.all([cricketFetch, footballFetch]); // run both sports concurrently
 
   if (team) {
     cricket = cricket.filter((m) => hit(m.localTeam, team) || hit(m.visitorTeam, team));
