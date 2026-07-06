@@ -6,6 +6,12 @@ const API = "";
 // Default cricket season id for the standings shortcut (adjust to current season).
 const CRICKET_SEASON = 1715;
 
+// Cricket competitions we can't render a points table for: there's no
+// competition->season map, only the single configured CRICKET_SEASON. Naming one
+// of these in a standings query gets an honest "not available" instead of the
+// unrelated default table.
+const CRICKET_NO_TABLE = new Set(["IPL", "Big Bash", "The Hundred", "Champions Trophy", "Ashes"]);
+
 // Map free text to a football-data.org competition code for standings.
 function footballCompetition(q) {
   if (/premier|\bepl\b|\bpl\b/.test(q)) return "PL";
@@ -352,6 +358,18 @@ async function handleMatches(sport, action, teams, format, gender, window, comp,
 
 async function handleStandings(sport, q) {
   const isFb = sport === "football";
+  if (!isFb) {
+    // We can only serve the one configured cricket season, not a named league's
+    // own table — say so rather than show an unrelated table.
+    const comp = detectCompetition(q);
+    if (comp && CRICKET_NO_TABLE.has(comp.label)) {
+      const off = comp.label === "IPL"
+        ? " The IPL runs Mar–May, so it isn't on right now — no points table or matches today."
+        : "";
+      addBotText(`I don't have a points table for <b>${esc(comp.label)}</b> — I only carry a default cricket standings season, not per-league tables.${off}`, "err");
+      return;
+    }
+  }
   let path, title;
   if (isFb) {
     const comp = footballCompetition(q || "");
