@@ -238,18 +238,18 @@ async function route(query) {
   const gender = detectGender(q); // "women" | "men" | null
   // An in-play-only metric: it exists only while a match is live (a target is
   // set once the first innings ends). Used to explain an NS/finished result.
-  const liveDetail = /\b(target|chase|required|run ?rate|\brrr\b|\bcrr\b|batting|bowling|striker)\b/.test(q);
+  const liveDetail = /\b(target|chase|required|run ?rate|\brrr\b|\bcrr\b|batting|bowling|striker|overs)\b/.test(q);
   const effSport = format || liveDetail || /\b(wicket|innings)\b/.test(q) ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
 
   let action;
   if (window) action = "matches"; // a dated query is about fixtures/results
-  // "Happening now" signals beat the noun "match" (e.g. "the India match"):
-  // explicit "live", "now"/"right now", "currently", or a live cricket action.
-  else if (/\blive\b|\bnow\b|currently|batting|bowling|winning/.test(q)) action = "live";
+  // In-play signals beat the nouns "match"/"game": explicit "live", "now"/"right
+  // now", "current(ly)", a live cricket action, or an in-play metric (over/score).
+  else if (liveDetail || /\blive\b|\bnow\b|current|batting|bowling|winning/.test(q)) action = "live";
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
-  else if (/(score|playing)/.test(q) || liveDetail) action = "live";
+  else if (/(score|playing)/.test(q)) action = "live";
   else if (teams.length || format || comp) action = "matches";
   else action = "live";
 
