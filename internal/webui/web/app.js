@@ -99,9 +99,15 @@ function detectSport(q) {
   return null; // unknown -> both
 }
 
-// Only real team names count as a team filter (never "cricket"/"football"/etc.).
-function detectTeam(q) {
-  return [...TEAMS_FOOTBALL, ...TEAMS_CRICKET].find((t) => q.includes(t)) || null;
+// All real team names in the query (never "cricket"/"football"/etc.). A query
+// like "India vs Australia" yields both, so we can require a match to involve
+// EVERY named team rather than silently dropping the second one.
+function detectTeams(q) {
+  const found = [];
+  for (const t of [...TEAMS_FOOTBALL, ...TEAMS_CRICKET]) {
+    if (q.includes(t) && !found.includes(t)) found.push(t);
+  }
+  return found; // [] | ["india"] | ["india", "australia"]
 }
 
 // Named competitions/tournaments. `re` matches both the query and the upstream
@@ -182,7 +188,7 @@ function parseDateWindow(q) {
 async function route(query) {
   const q = query.toLowerCase().trim();
   const sport = detectSport(q);
-  const team = detectTeam(q);
+  const teams = detectTeams(q);
 
   if (/(stand|table|points)/.test(q)) return handleStandings(sport || "football", q);
   if (/rank/.test(q)) return handleRankings(q);
@@ -193,23 +199,25 @@ async function route(query) {
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
 
-  let action = "live";
+  let action;
   if (window) action = "matches"; // a dated query is about fixtures/results
+  else if (/\blive\b/.test(q)) action = "live"; // explicit "live" beats the noun "match"
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
-  else if (/(live|score|now|playing)/.test(q)) action = "live";
-  else if (team || format || comp) action = "matches";
+  else if (/(score|now|playing)/.test(q)) action = "live";
+  else if (teams.length || format || comp) action = "matches";
+  else action = "live";
 
   console.log("%c⟐ INTENT", "color:#f0b429", {
     query, sport: effSport || "both", action,
-    team: team || null, format: format || null,
+    teams: teams.length ? teams : null, format: format || null,
     competition: comp ? comp.label : null, window: window ? window.label : null,
   });
-  return handleMatches(effSport, action, team, format, window, comp);
+  return handleMatches(effSport, action, teams, format, window, comp);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, team, format, window, comp) {
+async function handleMatches(sport, action, teams, format, window, comp) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
@@ -248,10 +256,13 @@ async function handleMatches(sport, action, team, format, window, comp) {
   })();
   await Promise.all([cricketFetch, footballFetch]); // run both sports concurrently
 
-  if (team) {
-    cricket = cricket.filter((m) => hit(m.localTeam, team) || hit(m.visitorTeam, team));
-    football = football.filter((m) => hit(m.homeTeam, team) || hit(m.awayTeam, team));
+  // Require the match to involve EVERY named team, so "India vs Australia" only
+  // matches an India–Australia game — not every India (or Australia) fixture.
+  if (teams.length) {
+    cricket = cricket.filter((m) => teams.every((t) => hit(m.localTeam, t) || hit(m.visitorTeam, t)));
+    football = football.filter((m) => teams.every((t) => hit(m.homeTeam, t) || hit(m.awayTeam, t)));
   }
+  const teamLabel = teams.map(cap).join(" vs ");
   // Filter to a named tournament by matching the upstream league name.
   if (comp) {
     cricket = cricket.filter((m) => comp.re.test((m.league || "").toLowerCase()));
@@ -266,11 +277,12 @@ async function handleMatches(sport, action, team, format, window, comp) {
     // for an ambiguous query, ignore football's "no token" and just say none found.
     const relevantErr = sport === "football" ? footballErr : cricketErr;
     if (relevantErr) { addBotText("⚠️ upstream error: " + esc(relevantErr), "err"); return; }
+    const forTeams = teams.length ? ` for “${esc(teamLabel)}”` : "";
     if (comp) {
-      addBotText(`No <b>${esc(comp.label)}</b> matches found${team ? ` for “${esc(cap(team))}”` : ""}${when} — it may not be running right now.`, "err");
+      addBotText(`No <b>${esc(comp.label)}</b> matches found${forTeams}${when} — it may not be running right now.`, "err");
       return;
     }
-    addBotText(`No ${fmt}${live ? "live " : ""}matches found${team ? ` for “${esc(cap(team))}”` : ""}${when}. Try “live football” or a team name.`, "err");
+    addBotText(`No ${fmt}${live ? "live " : ""}matches found${forTeams}${when}. Try “live football” or a team name.`, "err");
     return;
   }
 
@@ -279,7 +291,7 @@ async function handleMatches(sport, action, team, format, window, comp) {
   cricket.forEach((m) => grid.appendChild(cricketCard(m)));
   football.forEach((m) => grid.appendChild(footballCard(m)));
   const label = live ? "Live now" : window ? `${fmt}${window.label}` : `${fmt}Fixtures & results`;
-  const suffix = (team ? ` · ${cap(team)}` : "") + (comp ? ` · ${comp.label}` : "");
+  const suffix = (teams.length ? ` · ${teamLabel}` : "") + (comp ? ` · ${comp.label}` : "");
   addBotNode(`${label} — ${total} match${total > 1 ? "es" : ""}${suffix}`, grid);
   wireTilt(grid);
 }
