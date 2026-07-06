@@ -169,6 +169,23 @@ function matchesFormat(type, format) {
   return true;
 }
 
+// Gender qualifier in the query, or null. "women's"/"ladies" -> women. Checked
+// before men so "women" is never misread (\bmen\b can't match inside "women").
+function detectGender(q) {
+  if (/\b(women'?s?|womens|ladies|female)\b/.test(q)) return "women";
+  if (/\b(men'?s?|mens|male)\b/.test(q)) return "men";
+  return null;
+}
+
+// Whether a name denotes a women's team/competition. SportMonks suffixes
+// women's teams with " W" (e.g. "England W") and names women's leagues with
+// "Women" (e.g. "ICC Women's T20 World Cup", "T20 Blast Women's").
+function isWomensText(s) {
+  s = (s || "").toLowerCase().trim();
+  return /women/.test(s) || /\sw$/.test(s);
+}
+const isWomensMatch = (...names) => names.some(isWomensText);
+
 // YYYY-MM-DD, `offset` days from today in IST (UTC+5:30, no DST).
 // "today"/"yesterday"/"tomorrow" are the user's calendar days, not UTC's.
 function isoDate(offset) {
@@ -212,6 +229,7 @@ async function route(query) {
   // A named cricket format (test/oneday/t20) or a batting/bowling question
   // implies cricket (+ a type filter for formats).
   const format = detectFormat(q);
+  const gender = detectGender(q); // "women" | "men" | null
   const effSport = format || /\b(batting|bowling|wicket|innings)\b/.test(q) ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
@@ -228,15 +246,15 @@ async function route(query) {
 
   console.log("%c⟐ INTENT", "color:#f0b429", {
     query, sport: effSport || "both", action,
-    teams: teams.length ? teams : null, format: format || null,
+    teams: teams.length ? teams : null, format: format || null, gender: gender || null,
     competition: comp ? comp.label : null, window: window ? window.label : null,
   });
-  return handleMatches(effSport, action, teams, format, window, comp);
+  return handleMatches(effSport, action, teams, format, gender, window, comp);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, teams, format, window, comp) {
+async function handleMatches(sport, action, teams, format, gender, window, comp) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
@@ -287,9 +305,16 @@ async function handleMatches(sport, action, teams, format, window, comp) {
     cricket = cricket.filter((m) => comp.re.test((m.league || "").toLowerCase()));
     football = football.filter((m) => comp.re.test((m.league || "").toLowerCase()));
   }
+  // Filter by gender: women's teams carry a " W" suffix / "Women" league name.
+  if (gender) {
+    const wantWomen = gender === "women";
+    cricket = cricket.filter((m) => isWomensMatch(m.league, m.localTeam, m.visitorTeam) === wantWomen);
+    football = football.filter((m) => isWomensMatch(m.league, m.homeTeam, m.awayTeam) === wantWomen);
+  }
 
   const total = cricket.length + football.length;
-  const fmt = format ? `${format} ` : "";
+  const gen = gender ? (gender === "women" ? "Women's " : "Men's ") : "";
+  const fmt = `${gen}${format ? format + " " : ""}`;
   const when = window ? ` ${window.label.toLowerCase()}` : "";
   if (!total) {
     // Surface an upstream error only for the sport the user actually targeted;
