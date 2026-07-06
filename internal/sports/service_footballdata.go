@@ -51,19 +51,27 @@ func (fs *FootballDataService) Matches(ctx context.Context, q url.Values) ([]Foo
 			now := time.Now().UTC()
 			f0, t0 = now.Format("2006-01-02"), now.AddDate(0, 0, 7).Format("2006-01-02")
 		}
+		// Upstream filters by UTC date, but an IST day starts on the previous UTC
+		// day (IST = UTC+5:30), so widen the fetch a day earlier and let the IST
+		// filter below trim it back to the requested window.
+		fetchFrom := f0
+		if explicit {
+			fetchFrom = prevDay(f0)
+		}
 		var ms []footballdata.Match
 		var err error
 		if comp != "" {
-			ms, err = fs.client.MatchesByCompetition(ctx, comp, f0, t0)
+			ms, err = fs.client.MatchesByCompetition(ctx, comp, fetchFrom, t0)
 		} else {
-			ms, err = fs.client.MatchesBetween(ctx, f0, t0)
+			ms, err = fs.client.MatchesBetween(ctx, fetchFrom, t0)
 		}
 		if err != nil {
 			return nil, err
 		}
 		out := fdMapMatches(ms)
 		// The competition endpoint returns the whole matchday, not a strict date
-		// range — so enforce the requested window when the user asked for a date.
+		// range — so enforce the requested window (in IST) when the user asked
+		// for a specific date.
 		if explicit {
 			out = filterByDateWindow(out, f0, t0)
 		}

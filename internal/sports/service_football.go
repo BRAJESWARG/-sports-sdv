@@ -83,12 +83,19 @@ func (fs *FootballService) Matches(ctx context.Context, q url.Values) ([]Footbal
 				now := time.Now().UTC()
 				f0, t0 = now.Format("2006-01-02"), now.AddDate(0, 0, 14).Format("2006-01-02")
 			}
-			fx, err = fs.client.FixturesByLeague(ctx, league, currentSeason(), f0, t0)
+			explicit := date != "" || (from != "" && to != "")
+			// IST days start on the previous UTC day, so fetch a day earlier and
+			// let the IST filter below trim back to the requested window.
+			fetchFrom := f0
+			if explicit {
+				fetchFrom = prevDay(f0)
+			}
+			fx, err = fs.client.FixturesByLeague(ctx, league, currentSeason(), fetchFrom, t0)
 			if err != nil {
 				return nil, err
 			}
 			out := mapFootballMatches(fx)
-			if date != "" || (from != "" && to != "") {
+			if explicit {
 				out = filterByDateWindow(out, f0, t0)
 			}
 			return out, nil
@@ -163,7 +170,31 @@ func (fs *FootballService) Leagues(ctx context.Context, _ url.Values) ([]Footbal
 
 // ---- mapping ----
 
-// filterByDateWindow keeps matches whose (UTC) start date falls within [from, to]
+// istZone is UTC+5:30 (no DST). Match times come from upstreams in UTC, but the
+// UI's "today"/"yesterday" are IST calendar days, so we bucket by IST date.
+var istZone = time.FixedZone("IST", (5*60+30)*60)
+
+// istDate returns the IST calendar date (YYYY-MM-DD) of a UTC timestamp such as
+// "2026-07-06T19:00:00Z". Falls back to the leading date on a parse failure.
+func istDate(ts string) string {
+	if t, err := time.Parse(time.RFC3339, ts); err == nil {
+		return t.In(istZone).Format("2006-01-02")
+	}
+	if len(ts) >= 10 {
+		return ts[:10]
+	}
+	return ts
+}
+
+// prevDay returns the day before a YYYY-MM-DD date (unchanged on parse failure).
+func prevDay(d string) string {
+	if t, err := time.Parse("2006-01-02", d); err == nil {
+		return t.AddDate(0, 0, -1).Format("2006-01-02")
+	}
+	return d
+}
+
+// filterByDateWindow keeps matches whose IST start date falls within [from, to]
 // (both YYYY-MM-DD, inclusive). Used to enforce an explicit date window when the
 // upstream returns extra matches (e.g. a whole tournament matchday).
 func filterByDateWindow(ms []FootballMatchDTO, from, to string) []FootballMatchDTO {
@@ -172,10 +203,7 @@ func filterByDateWindow(ms []FootballMatchDTO, from, to string) []FootballMatchD
 	}
 	out := make([]FootballMatchDTO, 0, len(ms))
 	for _, m := range ms {
-		d := m.StartingAt
-		if len(d) >= 10 {
-			d = d[:10]
-		}
+		d := istDate(m.StartingAt)
 		if d >= from && d <= to {
 			out = append(out, m)
 		}

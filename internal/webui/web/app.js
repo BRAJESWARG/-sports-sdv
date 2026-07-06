@@ -147,11 +147,13 @@ function matchesFormat(type, format) {
   return true;
 }
 
-// YYYY-MM-DD, `offset` days from today (UTC).
+// YYYY-MM-DD, `offset` days from today in IST (UTC+5:30, no DST).
+// "today"/"yesterday"/"tomorrow" are the user's calendar days, not UTC's.
 function isoDate(offset) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + offset);
-  return d.toISOString().slice(0, 10);
+  const IST_OFFSET_MIN = 5 * 60 + 30;
+  const ist = new Date(Date.now() + IST_OFFSET_MIN * 60000);
+  ist.setUTCDate(ist.getUTCDate() + offset);
+  return ist.toISOString().slice(0, 10);
 }
 
 // Format an upstream timestamp (ISO or "YYYY-MM-DD HH:MM:SS", assumed UTC) for display.
