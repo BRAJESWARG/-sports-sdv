@@ -226,11 +226,14 @@ async function route(query) {
   if (/(stand|table|points)/.test(q)) return handleStandings(sport || "football", q);
   if (/rank/.test(q)) return handleRankings(q);
 
-  // A named cricket format (test/oneday/t20) or a batting/bowling question
-  // implies cricket (+ a type filter for formats).
+  // A named cricket format (test/oneday/t20), or an in-play detail question
+  // (batting/bowling, target/chase/run-rate) implies cricket.
   const format = detectFormat(q);
   const gender = detectGender(q); // "women" | "men" | null
-  const effSport = format || /\b(batting|bowling|wicket|innings)\b/.test(q) ? "cricket" : sport;
+  // An in-play-only metric: it exists only while a match is live (a target is
+  // set once the first innings ends). Used to explain an NS/finished result.
+  const liveDetail = /\b(target|chase|required|run ?rate|\brrr\b|\bcrr\b|batting|bowling|striker)\b/.test(q);
+  const effSport = format || liveDetail || /\b(wicket|innings)\b/.test(q) ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
 
@@ -240,21 +243,21 @@ async function route(query) {
   // explicit "live", "now"/"right now", "currently", or a live cricket action.
   else if (/\blive\b|\bnow\b|currently|batting|bowling|winning/.test(q)) action = "live";
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
-  else if (/(score|playing)/.test(q)) action = "live";
+  else if (/(score|playing)/.test(q) || liveDetail) action = "live";
   else if (teams.length || format || comp) action = "matches";
   else action = "live";
 
   console.log("%c⟐ INTENT", "color:#f0b429", {
     query, sport: effSport || "both", action,
     teams: teams.length ? teams : null, format: format || null, gender: gender || null,
-    competition: comp ? comp.label : null, window: window ? window.label : null,
+    liveDetail, competition: comp ? comp.label : null, window: window ? window.label : null,
   });
-  return handleMatches(effSport, action, teams, format, gender, window, comp);
+  return handleMatches(effSport, action, teams, format, gender, window, comp, liveDetail);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, teams, format, gender, window, comp) {
+async function handleMatches(sport, action, teams, format, gender, window, comp, liveDetail) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
@@ -338,6 +341,13 @@ async function handleMatches(sport, action, teams, format, gender, window, comp)
   const suffix = (teams.length ? ` · ${teamLabel}` : "") + (comp ? ` · ${comp.label}` : "");
   addBotNode(`${label} — ${total} match${total > 1 ? "es" : ""}${suffix}`, grid);
   wireTilt(grid);
+
+  // The user asked for an in-play detail (target/chase/run-rate) but nothing is
+  // live, so a target/score doesn't exist yet — say so instead of a blank card.
+  const anyLive = cricket.some((m) => m.live) || football.some((m) => m.live);
+  if (liveDetail && !anyLive) {
+    addBotText("ⓘ Nothing is in play right now, so there's no live target/score yet — a target is set once the first innings ends.", "note");
+  }
 }
 
 async function handleStandings(sport, q) {
