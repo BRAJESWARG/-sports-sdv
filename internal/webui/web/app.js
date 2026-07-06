@@ -209,17 +209,20 @@ async function route(query) {
   if (/(stand|table|points)/.test(q)) return handleStandings(sport || "football", q);
   if (/rank/.test(q)) return handleRankings(q);
 
-  // A named cricket format (test/oneday/t20) implies cricket + a type filter.
+  // A named cricket format (test/oneday/t20) or a batting/bowling question
+  // implies cricket (+ a type filter for formats).
   const format = detectFormat(q);
-  const effSport = format ? "cricket" : sport;
+  const effSport = format || /\b(batting|bowling|wicket|innings)\b/.test(q) ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
 
   let action;
   if (window) action = "matches"; // a dated query is about fixtures/results
-  else if (/\blive\b/.test(q)) action = "live"; // explicit "live" beats the noun "match"
+  // "Happening now" signals beat the noun "match" (e.g. "the India match"):
+  // explicit "live", "now"/"right now", "currently", or a live cricket action.
+  else if (/\blive\b|\bnow\b|currently|batting|bowling|winning/.test(q)) action = "live";
   else if (/(match|fixture|schedule|upcoming|result|game|list|near|next)/.test(q)) action = "matches";
-  else if (/(score|now|playing)/.test(q)) action = "live";
+  else if (/(score|playing)/.test(q)) action = "live";
   else if (teams.length || format || comp) action = "matches";
   else action = "live";
 
