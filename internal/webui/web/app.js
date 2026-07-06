@@ -302,6 +302,11 @@ async function handleMatches(sport, action, teams, format, gender, window, comp,
   })();
   await Promise.all([cricketFetch, footballFetch]); // run both sports concurrently
 
+  // Drop placeholder fixtures with no teams yet (e.g. football-data.org's TBD
+  // knockout brackets), which would otherwise render as blank "— vs —" cards.
+  cricket = cricket.filter((m) => m.localTeam || m.visitorTeam);
+  football = football.filter((m) => m.homeTeam || m.awayTeam);
+
   // Require the match to involve EVERY named team, so "India vs Australia" only
   // matches an India–Australia game — not every India (or Australia) fixture.
   if (teams.length) {
@@ -326,6 +331,15 @@ async function handleMatches(sport, action, teams, format, gender, window, comp,
   const fmt = `${gen}${format ? format + " " : ""}`;
   const when = window ? ` ${window.label.toLowerCase()}` : "";
   if (!total) {
+    // A live query for a specific competition/team with nothing in play: don't
+    // dead-end at "none". Fall back to its recent & upcoming fixtures across ALL
+    // sports (sport is still whatever was detected — null means both).
+    if (live && (comp || teams.length)) {
+      const who = comp ? `<b>${esc(comp.label)}</b>` : `“${esc(teamLabel)}”`;
+      addBotText(`No live ${who} match right now — showing recent & upcoming instead.`, "note");
+      const recentUpcoming = { from: isoDate(-1), to: isoDate(7), label: "Recent & upcoming" };
+      return handleMatches(sport, "matches", teams, format, gender, recentUpcoming, comp, liveDetail);
+    }
     // Surface an upstream error only for the sport the user actually targeted;
     // for an ambiguous query, ignore football's "no token" and just say none found.
     const relevantErr = sport === "football" ? footballErr : cricketErr;
