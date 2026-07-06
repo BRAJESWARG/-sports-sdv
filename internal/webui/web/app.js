@@ -19,10 +19,24 @@ function footballCompetition(q) {
   return "PL"; // default
 }
 
-// Actual team names (used for filtering matches by team).
-const TEAMS_FOOTBALL = ["arsenal", "chelsea", "liverpool", "manchester", "man city", "tottenham", "spurs"];
-const TEAMS_CRICKET = ["india", "england", "australia", "sweden", "portugal", "south africa",
-  "new zealand", "sri lanka", "bangladesh", "pakistan", "west indies", "zimbabwe", "ireland", "afghanistan"];
+// Teams we can filter matches by. Each entry is [canonical, ...aliases]: the
+// canonical is a substring of the upstream team name (used to filter), and any
+// alias (incl. short codes like "CSK"/"MI") lets us spot the team in a query.
+// Short codes (<= 3 chars) match as WHOLE WORDS only, so "MI" doesn't hit
+// "Middlesex"/"Miami" and "DC" doesn't hit a random substring.
+const TEAMS = [
+  // Cricket nations
+  ["india"], ["england"], ["australia"], ["sweden"], ["portugal"],
+  ["south africa"], ["new zealand"], ["sri lanka"], ["bangladesh"],
+  ["pakistan"], ["west indies"], ["zimbabwe"], ["ireland"], ["afghanistan"],
+  // IPL franchises — canonical is the city (matches "Chennai Super Kings" etc.)
+  ["chennai", "csk"], ["mumbai", "mi"], ["bangalore", "rcb", "bengaluru", "royal challengers"],
+  ["kolkata", "kkr", "knight riders"], ["hyderabad", "srh", "sunrisers"],
+  ["delhi", "dc", "capitals"], ["punjab", "pbks", "kings xi"],
+  ["rajasthan", "rr", "royals"], ["gujarat", "gt", "titans"], ["lucknow", "lsg"],
+  // Football clubs
+  ["arsenal"], ["chelsea"], ["liverpool"], ["manchester"], ["man city"], ["tottenham", "spurs"],
+];
 
 // Sport is detected ONLY from sport-specific words — NOT team names — so a bare
 // team that plays both (e.g. "Portugal") searches BOTH cricket and football.
@@ -99,15 +113,17 @@ function detectSport(q) {
   return null; // unknown -> both
 }
 
-// All real team names in the query (never "cricket"/"football"/etc.). A query
-// like "India vs Australia" yields both, so we can require a match to involve
-// EVERY named team rather than silently dropping the second one.
+// Canonical team substrings named in the query (never "cricket"/"football"/etc.).
+// A query like "CSK vs MI" yields ["chennai", "mumbai"] so we can require a match
+// to involve EVERY named team rather than silently dropping one — or showing all.
 function detectTeams(q) {
   const found = [];
-  for (const t of [...TEAMS_FOOTBALL, ...TEAMS_CRICKET]) {
-    if (q.includes(t) && !found.includes(t)) found.push(t);
+  for (const [canonical, ...aliases] of TEAMS) {
+    const named = [canonical, ...aliases].some((a) =>
+      a.length <= 3 ? new RegExp(`\\b${a}\\b`).test(q) : q.includes(a));
+    if (named && !found.includes(canonical)) found.push(canonical);
   }
-  return found; // [] | ["india"] | ["india", "australia"]
+  return found; // [] | ["chennai"] | ["chennai", "mumbai"]
 }
 
 // Named competitions/tournaments. `re` matches both the query and the upstream
