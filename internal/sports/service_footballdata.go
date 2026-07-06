@@ -39,6 +39,7 @@ func (fs *FootballDataService) Livescores(ctx context.Context) ([]FootballMatchD
 func (fs *FootballDataService) Matches(ctx context.Context, q url.Values) ([]FootballMatchDTO, error) {
 	date, from, to, comp := q.Get("date"), q.Get("from"), q.Get("to"), q.Get("competition")
 	key := "fbd:matches?" + q.Encode()
+	explicit := date != "" || (from != "" && to != "")
 	return cacheAside(ctx, fs.cache, key, fs.ttl, func(ctx context.Context) ([]FootballMatchDTO, error) {
 		var f0, t0 string
 		switch {
@@ -60,7 +61,13 @@ func (fs *FootballDataService) Matches(ctx context.Context, q url.Values) ([]Foo
 		if err != nil {
 			return nil, err
 		}
-		return fdMapMatches(ms), nil
+		out := fdMapMatches(ms)
+		// The competition endpoint returns the whole matchday, not a strict date
+		// range — so enforce the requested window when the user asked for a date.
+		if explicit {
+			out = filterByDateWindow(out, f0, t0)
+		}
+		return out, nil
 	})
 }
 

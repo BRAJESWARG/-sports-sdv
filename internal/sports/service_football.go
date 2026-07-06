@@ -84,10 +84,17 @@ func (fs *FootballService) Matches(ctx context.Context, q url.Values) ([]Footbal
 				f0, t0 = now.Format("2006-01-02"), now.AddDate(0, 0, 14).Format("2006-01-02")
 			}
 			fx, err = fs.client.FixturesByLeague(ctx, league, currentSeason(), f0, t0)
-		} else {
-			day := firstNonEmpty(date, from, time.Now().UTC().Format("2006-01-02"))
-			fx, err = fs.client.FixturesByDate(ctx, day)
+			if err != nil {
+				return nil, err
+			}
+			out := mapFootballMatches(fx)
+			if date != "" || (from != "" && to != "") {
+				out = filterByDateWindow(out, f0, t0)
+			}
+			return out, nil
 		}
+		day := firstNonEmpty(date, from, time.Now().UTC().Format("2006-01-02"))
+		fx, err = fs.client.FixturesByDate(ctx, day)
 		if err != nil {
 			return nil, err
 		}
@@ -155,6 +162,26 @@ func (fs *FootballService) Leagues(ctx context.Context, _ url.Values) ([]Footbal
 }
 
 // ---- mapping ----
+
+// filterByDateWindow keeps matches whose (UTC) start date falls within [from, to]
+// (both YYYY-MM-DD, inclusive). Used to enforce an explicit date window when the
+// upstream returns extra matches (e.g. a whole tournament matchday).
+func filterByDateWindow(ms []FootballMatchDTO, from, to string) []FootballMatchDTO {
+	if from == "" || to == "" {
+		return ms
+	}
+	out := make([]FootballMatchDTO, 0, len(ms))
+	for _, m := range ms {
+		d := m.StartingAt
+		if len(d) >= 10 {
+			d = d[:10]
+		}
+		if d >= from && d <= to {
+			out = append(out, m)
+		}
+	}
+	return out
+}
 
 func mapFootballMatches(fx []football.Fixture) []FootballMatchDTO {
 	out := make([]FootballMatchDTO, 0, len(fx))
