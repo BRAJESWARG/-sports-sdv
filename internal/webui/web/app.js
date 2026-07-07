@@ -239,6 +239,9 @@ async function route(query) {
   // An in-play-only metric: it exists only while a match is live (a target is
   // set once the first innings ends). Used to explain an NS/finished result.
   const liveDetail = /\b(target|chase|required|run ?rate|\brrr\b|\bcrr\b|batting|bowling|striker|overs)\b/.test(q);
+  // "Upcoming"/"schedule"/"fixtures" want the whole forward schedule, not just
+  // the default 7-day window (which misses later series like a second tour).
+  const upcoming = /\b(upcoming|schedule|fixtures?)\b/.test(q);
   const effSport = format || liveDetail || /\b(wicket|innings)\b/.test(q) ? "cricket" : sport;
   const window = parseDateWindow(q); // e.g. "yesterday", "last week", "results"
   const comp = detectCompetition(q); // e.g. "world cup", "ipl"
@@ -256,14 +259,14 @@ async function route(query) {
   console.log("%c⟐ INTENT", "color:#f0b429", {
     query, sport: effSport || "both", action,
     teams: teams.length ? teams : null, format: format || null, gender: gender || null,
-    liveDetail, competition: comp ? comp.label : null, window: window ? window.label : null,
+    liveDetail, upcoming, competition: comp ? comp.label : null, window: window ? window.label : null,
   });
-  return handleMatches(effSport, action, teams, format, gender, window, comp, liveDetail);
+  return handleMatches(effSport, action, teams, format, gender, window, comp, liveDetail, upcoming);
 }
 
 // ---------- handlers ----------
 
-async function handleMatches(sport, action, teams, format, gender, window, comp, liveDetail) {
+async function handleMatches(sport, action, teams, format, gender, window, comp, liveDetail, upcoming) {
   const wantCricket = sport !== "football";
   const wantFootball = sport !== "cricket";
   const live = action === "live";
@@ -278,8 +281,9 @@ async function handleMatches(sport, action, teams, format, gender, window, comp,
       let path = live ? "/api/v1/livescores" : "/api/v1/matches";
       if (!live) {
         if (window) path = `/api/v1/matches${range}`;
-        // Widen the window for a format query so scheduled Tests/ODIs actually appear.
-        else if (format) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
+        // Widen the window for a format ("Tests") or upcoming/schedule query so
+        // matches beyond the default 7-day window (later series) actually appear.
+        else if (format || upcoming) path = `/api/v1/matches?from=${isoDate(0)}&to=${isoDate(120)}`;
       }
       cricket = (await api(path)).data || [];
       if (format) cricket = cricket.filter((m) => matchesFormat(m.type, format));
@@ -338,7 +342,7 @@ async function handleMatches(sport, action, teams, format, gender, window, comp,
       const who = comp ? `<b>${esc(comp.label)}</b>` : `“${esc(teamLabel)}”`;
       addBotText(`No live ${who} match right now — showing recent & upcoming instead.`, "note");
       const recentUpcoming = { from: isoDate(-1), to: isoDate(7), label: "Recent & upcoming" };
-      return handleMatches(sport, "matches", teams, format, gender, recentUpcoming, comp, liveDetail);
+      return handleMatches(sport, "matches", teams, format, gender, recentUpcoming, comp, liveDetail, upcoming);
     }
     // Surface an upstream error only for the sport the user actually targeted;
     // for an ambiguous query, ignore football's "no token" and just say none found.
