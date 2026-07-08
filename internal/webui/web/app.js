@@ -42,6 +42,13 @@ const TEAMS = [
   ["rajasthan", "rr", "royals"], ["gujarat", "gt", "titans"], ["lucknow", "lsg"],
   // Football clubs
   ["arsenal"], ["chelsea"], ["liverpool"], ["manchester"], ["man city"], ["tottenham", "spurs"],
+  // Football national teams (World Cup). England/Portugal/Sweden/etc. are already
+  // listed above (they also play cricket), so only the football-only ones here.
+  ["argentina"], ["brazil"], ["spain"], ["france"], ["germany"], ["netherlands", "holland"],
+  ["belgium"], ["croatia"], ["italy"], ["mexico"], ["usa", "united states"], ["uruguay"],
+  ["colombia"], ["senegal"], ["morocco"], ["japan"], ["korea"], ["switzerland"], ["denmark"],
+  ["poland"], ["egypt"], ["ecuador"], ["austria"], ["serbia"], ["ghana"], ["nigeria"],
+  ["cameroon"], ["algeria"], ["norway"], ["canada"], ["congo"], ["bosnia"], ["wales"],
 ];
 
 // Sport is detected ONLY from sport-specific words — NOT team names — so a bare
@@ -214,7 +221,7 @@ function fmtDateTime(s) {
 // Parse a relative date range from the query, or null for the default window.
 function parseDateWindow(q) {
   const day = (o) => isoDate(o);
-  if (/\byesterday'?s?\b/.test(q)) return { from: day(-1), to: day(-1), label: "Yesterday" };
+  if (/\byesterday'?s?\b|\blast ?day'?s?\b/.test(q)) return { from: day(-1), to: day(-1), label: "Yesterday" };
   if (/\btomorrow'?s?\b/.test(q)) return { from: day(1), to: day(1), label: "Tomorrow" };
   if (/\btoday'?s?\b/.test(q)) return { from: day(0), to: day(0), label: "Today" };
   if (/last week|past week|last 7 days|last seven days/.test(q)) return { from: day(-7), to: day(0), label: "Last 7 days" };
