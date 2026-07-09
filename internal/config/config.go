@@ -30,6 +30,10 @@ type Config struct {
 	FootballBaseURL            string
 	FootballInsecureSkipVerify bool
 
+	// --- Flights (AviationStack) ---
+	AviationStackKey     string
+	AviationStackBaseURL string
+
 	CacheTTL     time.Duration
 	CacheTTLLive time.Duration
 
@@ -51,6 +55,8 @@ func Load() (*Config, error) {
 		FootballToken:                firstNonEmpty(os.Getenv("FOOTBALL_API_TOKEN"), os.Getenv("SPORTMONKS_FOOTBALL_TOKEN")),
 		FootballBaseURL:              os.Getenv("FOOTBALL_BASE_URL"), // provider-default applied below
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
+		AviationStackKey:             os.Getenv("AVIATIONSTACK_ACCESS_KEY"),
+		AviationStackBaseURL:         getenv("AVIATIONSTACK_BASE_URL", "https://api.aviationstack.com/v1"),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
 		CacheTTLLive:                 getdur("CACHE_TTL_LIVE", 20*time.Second),
 		UpstreamTimeout:              getdur("UPSTREAM_TIMEOUT", 30*time.Second),

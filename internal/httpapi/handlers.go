@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bgmaster/sports-sdv/internal/aviationstack"
 	"github.com/bgmaster/sports-sdv/internal/football"
 	"github.com/bgmaster/sports-sdv/internal/sportmonks"
 	"github.com/bgmaster/sports-sdv/internal/sports"
@@ -39,6 +40,11 @@ func mapUpstreamError(w http.ResponseWriter, err error) {
 	var fbErr *football.APIError
 	if errors.As(err, &fbErr) {
 		writeError(w, http.StatusBadGateway, "upstream error: "+fbErr.Message)
+		return
+	}
+	var flErr *aviationstack.APIError
+	if errors.As(err, &flErr) {
+		writeError(w, http.StatusBadGateway, "upstream error: "+flErr.Message)
 		return
 	}
 	writeError(w, http.StatusInternalServerError, err.Error())

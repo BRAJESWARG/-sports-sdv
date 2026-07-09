@@ -5,15 +5,17 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/bgmaster/sports-sdv/internal/flights"
 	"github.com/bgmaster/sports-sdv/internal/sports"
 	"github.com/bgmaster/sports-sdv/internal/webui"
 )
 
 // NewRouter builds the http.Handler for the service. It uses the stdlib
 // ServeMux method+pattern routing added in Go 1.22.
-func NewRouter(cricket *sports.Service, football sports.FootballAPI, log *slog.Logger) http.Handler {
+func NewRouter(cricket *sports.Service, football sports.FootballAPI, flight *flights.Service, log *slog.Logger) http.Handler {
 	h := &Handlers{svc: cricket}
 	fb := &FootballHandlers{svc: football}
+	fl := &FlightHandlers{svc: flight}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.health)
@@ -32,6 +34,9 @@ func NewRouter(cricket *sports.Service, football sports.FootballAPI, log *slog.L
 	mux.HandleFunc("GET /api/v1/football/matches/{id}", fb.match)
 	mux.HandleFunc("GET /api/v1/football/standings", fb.standings)
 	mux.HandleFunc("GET /api/v1/football/leagues", fb.leagues)
+
+	// Flights (namespaced).
+	mux.HandleFunc("GET /api/v1/flights", fl.search)
 
 	// Chatbot UI (catch-all; more specific API routes above take precedence).
 	mux.Handle("GET /", webui.Handler())

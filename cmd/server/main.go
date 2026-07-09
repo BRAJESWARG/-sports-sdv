@@ -16,8 +16,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bgmaster/sports-sdv/internal/aviationstack"
 	"github.com/bgmaster/sports-sdv/internal/cache"
 	"github.com/bgmaster/sports-sdv/internal/config"
+	"github.com/bgmaster/sports-sdv/internal/flights"
 	"github.com/bgmaster/sports-sdv/internal/football"
 	"github.com/bgmaster/sports-sdv/internal/footballdata"
 	"github.com/bgmaster/sports-sdv/internal/httpapi"
@@ -51,6 +53,7 @@ func main() {
 	sportmonks.LogBodyMax = cfg.LogBodyMax
 	football.LogBodyMax = cfg.LogBodyMax
 	footballdata.LogBodyMax = cfg.LogBodyMax
+	aviationstack.LogBodyMax = cfg.LogBodyMax
 	httpapi.LogBodyMax = cfg.LogBodyMax
 	if cfg.LogFile != "" {
 		log.Info("logging", "file", cfg.LogFile)
@@ -81,7 +84,16 @@ func main() {
 		fbSvc = sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
 		log.Info("football provider", "provider", "API-Football", "baseURL", cfg.FootballBaseURL)
 	}
-	router := httpapi.NewRouter(svc, fbSvc, log)
+	// Flights (AviationStack). Optional: the endpoint errors until a key is set.
+	flClient := aviationstack.New(cfg.AviationStackBaseURL, cfg.AviationStackKey, cfg.UpstreamTimeout, false)
+	flSvc := flights.New(flClient, mem, cfg.CacheTTL)
+	if cfg.AviationStackKey == "" {
+		log.Warn("AVIATIONSTACK_ACCESS_KEY is not set — /api/v1/flights will fail until a key is provided")
+	} else {
+		log.Info("flights provider", "provider", "AviationStack", "baseURL", cfg.AviationStackBaseURL)
+	}
+
+	router := httpapi.NewRouter(svc, fbSvc, flSvc, log)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
