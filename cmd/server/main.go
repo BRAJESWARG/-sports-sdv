@@ -20,11 +20,13 @@ import (
 	"github.com/bgmaster/sports-sdv/internal/cache"
 	"github.com/bgmaster/sports-sdv/internal/config"
 	"github.com/bgmaster/sports-sdv/internal/flights"
-	"github.com/bgmaster/sports-sdv/internal/football"
-	"github.com/bgmaster/sports-sdv/internal/footballdata"
+	"github.com/bgmaster/sports-sdv/internal/highlightly"
 	"github.com/bgmaster/sports-sdv/internal/httpapi"
-	"github.com/bgmaster/sports-sdv/internal/sportmonks"
 	"github.com/bgmaster/sports-sdv/internal/sports"
+	// --- old providers (kept, re-enable to switch back) ---
+	// "github.com/bgmaster/sports-sdv/internal/football"
+	// "github.com/bgmaster/sports-sdv/internal/footballdata"
+	// "github.com/bgmaster/sports-sdv/internal/sportmonks"
 )
 
 func main() {
@@ -50,40 +52,48 @@ func main() {
 	slog.SetDefault(log) // so provider clients' slog calls share this JSON handler
 
 	// Propagate the log-body cap to the clients + middleware (0 = unlimited).
-	sportmonks.LogBodyMax = cfg.LogBodyMax
-	football.LogBodyMax = cfg.LogBodyMax
-	footballdata.LogBodyMax = cfg.LogBodyMax
+	// --- old providers (SportMonks cricket + football); kept for reference ---
+	// sportmonks.LogBodyMax = cfg.LogBodyMax
+	// football.LogBodyMax = cfg.LogBodyMax
+	// footballdata.LogBodyMax = cfg.LogBodyMax
+	highlightly.LogBodyMax = cfg.LogBodyMax
 	aviationstack.LogBodyMax = cfg.LogBodyMax
 	httpapi.LogBodyMax = cfg.LogBodyMax
 	if cfg.LogFile != "" {
 		log.Info("logging", "file", cfg.LogFile)
 	}
 
-	client := sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
-	if cfg.SportmonksInsecureSkipVerify || cfg.FootballInsecureSkipVerify {
-		log.Warn("INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
-	}
-	if cfg.FootballToken == "" {
-		log.Warn("FOOTBALL_API_TOKEN is not set — football endpoints will fail until a token is provided")
-	}
-
 	mem := cache.NewMemory(time.Minute)
 	defer mem.Close()
 
-	svc := sports.New(client, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	// Cricket + football now come from Highlightly (one key, one client).
+	hlClient := highlightly.New(cfg.HighlightlyFootballBase, cfg.HighlightlyCricketBase, cfg.HighlightlyKey, cfg.HighlightlyTimezone, cfg.UpstreamTimeout, false)
+	var svc sports.CricketAPI = sports.NewHighlightlyCricket(hlClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	var fbSvc sports.FootballAPI = sports.NewHighlightlyFootball(hlClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	log.Info("cricket+football provider", "provider", "Highlightly",
+		"footballBase", cfg.HighlightlyFootballBase, "cricketBase", cfg.HighlightlyCricketBase)
 
-	// Football provider is selectable (FOOTBALL_PROVIDER); default = API-Football.
-	var fbSvc sports.FootballAPI
-	switch cfg.FootballProvider {
-	case "footballdata":
-		fdClient := footballdata.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
-		fbSvc = sports.NewFootballData(fdClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
-		log.Info("football provider", "provider", "football-data.org", "baseURL", cfg.FootballBaseURL)
-	default:
-		fbClient := football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
-		fbSvc = sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
-		log.Info("football provider", "provider", "API-Football", "baseURL", cfg.FootballBaseURL)
-	}
+	// --- old provider wiring (SportMonks cricket + selectable football); kept for reference ---
+	// client := sportmonks.New(cfg.SportmonksBaseURL, cfg.SportmonksToken, cfg.UpstreamTimeout, cfg.SportmonksInsecureSkipVerify)
+	// if cfg.SportmonksInsecureSkipVerify || cfg.FootballInsecureSkipVerify {
+	// 	log.Warn("INSECURE_SKIP_VERIFY is enabled — upstream TLS verification is OFF (dev only)")
+	// }
+	// if cfg.FootballToken == "" {
+	// 	log.Warn("FOOTBALL_API_TOKEN is not set — football endpoints will fail until a token is provided")
+	// }
+	// svc := sports.New(client, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	// var fbSvc sports.FootballAPI
+	// switch cfg.FootballProvider {
+	// case "footballdata":
+	// 	fdClient := footballdata.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
+	// 	fbSvc = sports.NewFootballData(fdClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	// 	log.Info("football provider", "provider", "football-data.org", "baseURL", cfg.FootballBaseURL)
+	// default:
+	// 	fbClient := football.New(cfg.FootballBaseURL, cfg.FootballToken, cfg.UpstreamTimeout, cfg.FootballInsecureSkipVerify)
+	// 	fbSvc = sports.NewFootball(fbClient, mem, cfg.CacheTTL, cfg.CacheTTLLive)
+	// 	log.Info("football provider", "provider", "API-Football", "baseURL", cfg.FootballBaseURL)
+	// }
+
 	// Flights (AviationStack). Optional: the endpoint errors until a key is set.
 	flClient := aviationstack.New(cfg.AviationStackBaseURL, cfg.AviationStackKey, cfg.UpstreamTimeout, false)
 	flSvc := flights.New(flClient, mem, cfg.CacheTTL)

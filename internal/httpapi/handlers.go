@@ -10,13 +10,15 @@ import (
 
 	"github.com/bgmaster/sports-sdv/internal/aviationstack"
 	"github.com/bgmaster/sports-sdv/internal/football"
+	"github.com/bgmaster/sports-sdv/internal/highlightly"
 	"github.com/bgmaster/sports-sdv/internal/sportmonks"
 	"github.com/bgmaster/sports-sdv/internal/sports"
 )
 
-// Handlers holds dependencies for the HTTP handlers.
+// Handlers holds dependencies for the HTTP handlers. svc is an interface so the
+// cricket provider (SportMonks or Highlightly) can be swapped at wiring time.
 type Handlers struct {
-	svc *sports.Service
+	svc sports.CricketAPI
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -45,6 +47,11 @@ func mapUpstreamError(w http.ResponseWriter, err error) {
 	var flErr *aviationstack.APIError
 	if errors.As(err, &flErr) {
 		writeError(w, http.StatusBadGateway, "upstream error: "+flErr.Message)
+		return
+	}
+	var hlErr *highlightly.APIError
+	if errors.As(err, &hlErr) {
+		writeError(w, http.StatusBadGateway, "upstream error: "+hlErr.Message)
 		return
 	}
 	writeError(w, http.StatusInternalServerError, err.Error())

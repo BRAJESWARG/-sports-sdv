@@ -30,6 +30,12 @@ type Config struct {
 	FootballBaseURL            string
 	FootballInsecureSkipVerify bool
 
+	// --- Cricket + Football provider: Highlightly (active) ---
+	HighlightlyKey          string
+	HighlightlyFootballBase string
+	HighlightlyCricketBase  string
+	HighlightlyTimezone     string
+
 	// --- Flights (AviationStack) ---
 	AviationStackKey     string
 	AviationStackBaseURL string
@@ -55,6 +61,10 @@ func Load() (*Config, error) {
 		FootballToken:                firstNonEmpty(os.Getenv("FOOTBALL_API_TOKEN"), os.Getenv("SPORTMONKS_FOOTBALL_TOKEN")),
 		FootballBaseURL:              os.Getenv("FOOTBALL_BASE_URL"), // provider-default applied below
 		FootballInsecureSkipVerify:   getbool("FOOTBALL_INSECURE_SKIP_VERIFY", false),
+		HighlightlyKey:               firstNonEmpty(os.Getenv("HIGHLIGHTLY_API_KEY"), os.Getenv("HIGHLIGHTLY_KEY")),
+		HighlightlyFootballBase:      getenv("HIGHLIGHTLY_FOOTBALL_BASE_URL", "https://sports.highlightly.net/football"),
+		HighlightlyCricketBase:       getenv("HIGHLIGHTLY_CRICKET_BASE_URL", "https://cricket.highlightly.net"),
+		HighlightlyTimezone:          getenv("HIGHLIGHTLY_TIMEZONE", "Asia/Kolkata"),
 		AviationStackKey:             os.Getenv("AVIATIONSTACK_ACCESS_KEY"),
 		AviationStackBaseURL:         getenv("AVIATIONSTACK_BASE_URL", "https://api.aviationstack.com/v1"),
 		CacheTTL:                     getdur("CACHE_TTL", 5*time.Minute),
@@ -71,9 +81,14 @@ func Load() (*Config, error) {
 		}
 	}
 
-	if cfg.SportmonksToken == "" {
-		return nil, fmt.Errorf("SPORTMONKS_API_TOKEN (or API_CRICKET_KEY) is required")
+	// Highlightly is now the active provider for cricket + football.
+	if cfg.HighlightlyKey == "" {
+		return nil, fmt.Errorf("HIGHLIGHTLY_API_KEY is required")
 	}
+	// --- old provider requirement (SportMonks); kept for reference ---
+	// if cfg.SportmonksToken == "" {
+	// 	return nil, fmt.Errorf("SPORTMONKS_API_TOKEN (or API_CRICKET_KEY) is required")
+	// }
 	return cfg, nil
 }
 
