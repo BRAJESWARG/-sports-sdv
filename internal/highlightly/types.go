@@ -6,7 +6,15 @@ package highlightly
 
 // listEnvelope wraps Highlightly list responses: {data:[...], plan, pagination}.
 type listEnvelope[T any] struct {
-	Data []T `json:"data"`
+	Data       []T          `json:"data"`
+	Pagination hlPagination `json:"pagination"`
+}
+
+// hlPagination is the paging block; totalCount can exceed the 100-row page limit.
+type hlPagination struct {
+	TotalCount int `json:"totalCount"`
+	Offset     int `json:"offset"`
+	Limit      int `json:"limit"`
 }
 
 // ---- Football ----

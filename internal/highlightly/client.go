@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -82,40 +83,64 @@ func logUpstream(sport, url string, status int, dur time.Duration, err error, bo
 		"bytes", len(body), "response", truncate(body), "dur", dur.String())
 }
 
+// hlPageLimit is Highlightly's per-request row cap; hlMaxOffset bounds how many
+// pages one date can fetch (so a huge day doesn't fan out unboundedly).
+const (
+	hlPageLimit = 100
+	hlMaxOffset = 300 // up to 3 pages / 300 matches per date
+)
+
 // FootballMatches returns all football matches for a single date (YYYY-MM-DD),
-// filtered/localised to the client's timezone.
+// paging through the 100-row limit so busy days aren't truncated.
 func (c *Client) FootballMatches(ctx context.Context, date string) ([]FootballMatch, error) {
-	body, err := c.get(ctx, "football", c.footballBase+"/matches", date)
-	if err != nil {
-		return nil, err
+	var all []FootballMatch
+	for offset := 0; offset < hlMaxOffset; offset += hlPageLimit {
+		body, err := c.get(ctx, "football", c.footballBase+"/matches", date, offset)
+		if err != nil {
+			return nil, err
+		}
+		var env listEnvelope[FootballMatch]
+		if err := json.Unmarshal(body, &env); err != nil {
+			return nil, fmt.Errorf("decode football matches: %w", err)
+		}
+		all = append(all, env.Data...)
+		if len(env.Data) == 0 || offset+hlPageLimit >= env.Pagination.TotalCount {
+			break
+		}
 	}
-	var env listEnvelope[FootballMatch]
-	if err := json.Unmarshal(body, &env); err != nil {
-		return nil, fmt.Errorf("decode football matches: %w", err)
-	}
-	return env.Data, nil
+	return all, nil
 }
 
-// CricketMatches returns all cricket matches for a single date (YYYY-MM-DD).
+// CricketMatches returns all cricket matches for a single date, paginated.
 func (c *Client) CricketMatches(ctx context.Context, date string) ([]CricketMatch, error) {
-	body, err := c.get(ctx, "cricket", c.cricketBase+"/matches", date)
-	if err != nil {
-		return nil, err
+	var all []CricketMatch
+	for offset := 0; offset < hlMaxOffset; offset += hlPageLimit {
+		body, err := c.get(ctx, "cricket", c.cricketBase+"/matches", date, offset)
+		if err != nil {
+			return nil, err
+		}
+		var env listEnvelope[CricketMatch]
+		if err := json.Unmarshal(body, &env); err != nil {
+			return nil, fmt.Errorf("decode cricket matches: %w", err)
+		}
+		all = append(all, env.Data...)
+		if len(env.Data) == 0 || offset+hlPageLimit >= env.Pagination.TotalCount {
+			break
+		}
 	}
-	var env listEnvelope[CricketMatch]
-	if err := json.Unmarshal(body, &env); err != nil {
-		return nil, fmt.Errorf("decode cricket matches: %w", err)
-	}
-	return env.Data, nil
+	return all, nil
 }
 
-func (c *Client) get(ctx context.Context, sport, base, date string) ([]byte, error) {
+func (c *Client) get(ctx context.Context, sport, base, date string, offset int) ([]byte, error) {
 	q := url.Values{}
 	if date != "" {
 		q.Set("date", date)
 	}
 	q.Set("timezone", c.timezone)
-	q.Set("limit", "100")
+	q.Set("limit", strconv.Itoa(hlPageLimit))
+	if offset > 0 {
+		q.Set("offset", strconv.Itoa(offset))
+	}
 	u := base + "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
